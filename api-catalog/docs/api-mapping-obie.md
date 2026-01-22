@@ -24,47 +24,50 @@ This document maps Bank Dhofar's existing proprietary APIs to UK Open Banking Im
 
 ## 2. Architecture: Adapter Pattern
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              TPP Request                                     │
-│                    (OBIE-compliant, FAPI-secured)                           │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         OBIE API Gateway Layer                               │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │ • FAPI Headers (x-fapi-interaction-id, x-fapi-auth-date, etc.)      │    │
-│  │ • Consent Validation                                                 │    │
-│  │ • OAuth2 Scope Enforcement                                           │    │
-│  │ • Request/Response Transformation                                    │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                    ┌───────────────────┼───────────────────┐
-                    ▼                   ▼                   ▼
-        ┌───────────────────┐ ┌─────────────────┐ ┌───────────────────┐
-        │   OBIE AIS        │ │   OBIE PIS      │ │   OBIE Events     │
-        │   Adapter         │ │   Adapter       │ │   Adapter         │
-        └─────────┬─────────┘ └────────┬────────┘ └─────────┬─────────┘
-                  │                    │                    │
-┌─────────────────┴────────────────────┴────────────────────┴─────────────────┐
-│                      Proprietary API Layer                                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │
-│   │ Corporate       │  │ EasyBiz         │  │ E-Mandate       │            │
-│   │ Banking APIs    │  │ Payment APIs    │  │ APIs            │            │
-│   └────────┬────────┘  └────────┬────────┘  └────────┬────────┘            │
-└────────────┼────────────────────┼────────────────────┼──────────────────────┘
-             │                    │                    │
-             ▼                    ▼                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Backend Systems                                    │
-│    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐             │
-│    │   Finacle     │    │   EasyBiz     │    │   CBO/        │             │
-│    │   (Core)      │    │   Platform    │    │   ProgressSoft│             │
-│    └───────────────┘    └───────────────┘    └───────────────┘             │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph TPP["TPP Request (OBIE-compliant, FAPI-secured)"]
+        TPP_App[TPP Application]
+    end
+
+    subgraph Gateway["OBIE API Gateway Layer"]
+        GW_Features["FAPI Headers | Consent Validation<br/>OAuth2 Scope Enforcement<br/>Request/Response Transformation"]
+    end
+
+    subgraph Adapters["Adapter Layer"]
+        AIS_Adapter[OBIE AIS Adapter]
+        PIS_Adapter[OBIE PIS Adapter]
+        Events_Adapter[OBIE Events Adapter]
+    end
+
+    subgraph Proprietary["Proprietary API Layer"]
+        Corp[Corporate Banking APIs]
+        EasyBiz[EasyBiz Payment APIs]
+        Emandate[E-Mandate APIs]
+    end
+
+    subgraph Backend["Backend Systems"]
+        Finacle[(Finacle<br/>Core Banking)]
+        EasyBiz_Platform[(EasyBiz<br/>Platform)]
+        CBO[(CBO/<br/>ProgressSoft)]
+    end
+
+    TPP_App --> Gateway
+    Gateway --> AIS_Adapter
+    Gateway --> PIS_Adapter
+    Gateway --> Events_Adapter
+
+    AIS_Adapter --> Corp
+    PIS_Adapter --> Corp
+    PIS_Adapter --> Emandate
+    Events_Adapter --> EasyBiz
+
+    Corp --> Finacle
+    EasyBiz --> EasyBiz_Platform
+    Emandate --> CBO
+
+    style Finacle fill:#336791,color:#fff
+    style CBO fill:#4D9134,color:#fff
 ```
 
 ---
