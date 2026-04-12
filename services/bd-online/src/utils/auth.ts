@@ -7,7 +7,7 @@
 
 import { UserManager, WebStorageStateStore, User } from 'oidc-client-ts';
 
-const KEYCLOAK_BASE = 'https://auth.tnd.bankdhofar.com/realms/open-banking';
+const KEYCLOAK_BASE = 'https://keycloak.uat.bankdhofar.com/realms/open-banking';
 const CLIENT_ID = 'bd-online';
 const REDIRECT_URI = `${window.location.origin}/auth/callback`;
 const POST_LOGOUT_URI = `${window.location.origin}/`;
