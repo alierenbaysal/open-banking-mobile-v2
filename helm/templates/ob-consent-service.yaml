@@ -17,6 +17,8 @@ spec:
         app: ob-consent-service
         app.kubernetes.io/part-of: qantara
     spec:
+      imagePullSecrets:
+        - name: gitlab-registry
       containers:
         - name: ob-consent-service
           image: {{ .Values.global.registry }}/{{ .Values.consentService.image }}:{{ .Values.global.imageTag }}

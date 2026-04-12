@@ -14,6 +14,7 @@ import {
   Anchor,
   List,
   Box,
+  SimpleGrid,
 } from '@mantine/core';
 import {
   IconUserPlus,

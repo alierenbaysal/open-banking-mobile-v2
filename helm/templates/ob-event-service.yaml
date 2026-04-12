@@ -17,6 +17,8 @@ spec:
         app: ob-event-service
         app.kubernetes.io/part-of: qantara
     spec:
+      imagePullSecrets:
+        - name: gitlab-registry
       containers:
         - name: ob-event-service
           image: {{ .Values.global.registry }}/{{ .Values.eventService.image }}:{{ .Values.global.imageTag }}

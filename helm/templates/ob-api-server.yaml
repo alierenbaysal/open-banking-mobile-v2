@@ -17,6 +17,8 @@ spec:
         app: ob-api-server
         app.kubernetes.io/part-of: qantara
     spec:
+      imagePullSecrets:
+        - name: gitlab-registry
       containers:
         - name: ob-api-server
           image: {{ .Values.global.registry }}/{{ .Values.apiServer.image }}:{{ .Values.global.imageTag }}

@@ -17,6 +17,8 @@ spec:
         app: ob-tpp-manager
         app.kubernetes.io/part-of: qantara
     spec:
+      imagePullSecrets:
+        - name: gitlab-registry
       containers:
         - name: ob-tpp-manager
           image: {{ .Values.global.registry }}/{{ .Values.tppManager.image }}:{{ .Values.global.imageTag }}
