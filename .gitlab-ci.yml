@@ -80,3 +80,31 @@ build-ob-portal:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - services/ob-portal/**/*
+
+build-bd-online:
+  <<: *build_template
+  script:
+    - >
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/services/bd-online"
+      --dockerfile "${CI_PROJECT_DIR}/services/bd-online/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/bd-online:${CI_COMMIT_SHORT_SHA}"
+      --destination "${CI_REGISTRY_IMAGE}/bd-online:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/bd-online/**/*
+
+build-masroofi:
+  <<: *build_template
+  script:
+    - >
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/services/masroofi"
+      --dockerfile "${CI_PROJECT_DIR}/services/masroofi/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/masroofi:${CI_COMMIT_SHORT_SHA}"
+      --destination "${CI_REGISTRY_IMAGE}/masroofi:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/masroofi/**/*
