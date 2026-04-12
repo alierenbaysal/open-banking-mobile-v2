@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/part-of: qantara
 spec:
   instances: {{ .Values.postgresql.instances }}
-  imageName: harbor.cp.bankdhofar.com/dockerhub/cloudnative-pg/postgresql:17
+  imageName: harbor.cp.bankdhofar.com/ghcr/cloudnative-pg/postgresql:17.5
 
   postgresql:
     parameters:
