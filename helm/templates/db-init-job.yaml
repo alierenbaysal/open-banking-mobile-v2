@@ -1,0 +1,182 @@
+---
+# Job to initialize database schema after PostgreSQL is ready
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qantara-db-init-{{ .Release.Revision }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/part-of: qantara
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: qantara-db-init
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: harbor.cp.bankdhofar.com/dockerhub/postgres:17-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until pg_isready -h qantara-postgres-rw -p 5432 -U {{ .Values.postgresql.owner }}; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+
+              echo "Running consent service migrations..."
+              psql "$DATABASE_URL" <<'SQL'
+              -- Extension
+              CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+              -- TPP Registry
+              CREATE TABLE IF NOT EXISTS tpp_registry (
+                  tpp_id VARCHAR(100) PRIMARY KEY,
+                  tpp_name VARCHAR(255) NOT NULL,
+                  tpp_name_ar VARCHAR(255),
+                  registration_number VARCHAR(100),
+                  is_aisp BOOLEAN DEFAULT FALSE,
+                  is_pisp BOOLEAN DEFAULT FALSE,
+                  is_cisp BOOLEAN DEFAULT FALSE,
+                  client_id VARCHAR(100) UNIQUE NOT NULL,
+                  redirect_uris TEXT[] NOT NULL,
+                  jwks_uri TEXT,
+                  software_statement TEXT,
+                  logo_uri TEXT,
+                  status VARCHAR(20) NOT NULL DEFAULT 'Active',
+                  onboarded_at TIMESTAMPTZ DEFAULT NOW(),
+                  CONSTRAINT valid_tpp_status CHECK (status IN ('Active', 'Suspended', 'Revoked'))
+              );
+
+              -- Consents
+              CREATE TABLE IF NOT EXISTS consents (
+                  consent_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  consent_type VARCHAR(50) NOT NULL,
+                  tpp_id VARCHAR(100) NOT NULL REFERENCES tpp_registry(tpp_id),
+                  customer_id VARCHAR(100),
+                  permissions JSONB NOT NULL DEFAULT '[]',
+                  selected_accounts JSONB,
+                  payment_details JSONB,
+                  control_parameters JSONB,
+                  status VARCHAR(30) NOT NULL DEFAULT 'AwaitingAuthorisation',
+                  status_update_time TIMESTAMPTZ DEFAULT NOW(),
+                  creation_time TIMESTAMPTZ DEFAULT NOW(),
+                  expiration_time TIMESTAMPTZ,
+                  authorization_time TIMESTAMPTZ,
+                  revocation_time TIMESTAMPTZ,
+                  revocation_reason VARCHAR(255),
+                  risk_data JSONB,
+                  CONSTRAINT valid_consent_status CHECK (status IN (
+                      'AwaitingAuthorisation', 'Authorised', 'Rejected',
+                      'Consumed', 'Revoked', 'Expired'
+                  ))
+              );
+
+              CREATE INDEX IF NOT EXISTS idx_consents_tpp ON consents(tpp_id);
+              CREATE INDEX IF NOT EXISTS idx_consents_customer ON consents(customer_id);
+              CREATE INDEX IF NOT EXISTS idx_consents_status ON consents(status);
+              CREATE INDEX IF NOT EXISTS idx_consents_expiration ON consents(expiration_time) WHERE status = 'Authorised';
+
+              -- Consent History (audit trail)
+              CREATE TABLE IF NOT EXISTS consent_history (
+                  id BIGSERIAL PRIMARY KEY,
+                  consent_id UUID NOT NULL REFERENCES consents(consent_id),
+                  event_type VARCHAR(50) NOT NULL,
+                  event_time TIMESTAMPTZ DEFAULT NOW(),
+                  actor_type VARCHAR(20) NOT NULL,
+                  actor_id VARCHAR(100),
+                  previous_status VARCHAR(30),
+                  new_status VARCHAR(30),
+                  details JSONB,
+                  ip_address INET,
+                  user_agent TEXT
+              );
+
+              CREATE INDEX IF NOT EXISTS idx_consent_history_consent ON consent_history(consent_id);
+              CREATE INDEX IF NOT EXISTS idx_consent_history_time ON consent_history(event_time);
+
+              -- Event Subscriptions
+              CREATE TABLE IF NOT EXISTS event_subscriptions (
+                  subscription_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  tpp_id VARCHAR(100) NOT NULL,
+                  callback_url TEXT NOT NULL,
+                  event_types TEXT[] NOT NULL,
+                  version VARCHAR(10) DEFAULT '4.0',
+                  status VARCHAR(20) DEFAULT 'Active',
+                  created_at TIMESTAMPTZ DEFAULT NOW(),
+                  updated_at TIMESTAMPTZ DEFAULT NOW()
+              );
+
+              CREATE INDEX IF NOT EXISTS idx_subscriptions_tpp ON event_subscriptions(tpp_id);
+
+              -- Events
+              CREATE TABLE IF NOT EXISTS events (
+                  event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  tpp_id VARCHAR(100) NOT NULL,
+                  event_type TEXT NOT NULL,
+                  subject TEXT NOT NULL,
+                  resource_id VARCHAR(100),
+                  resource_type VARCHAR(50),
+                  payload JSONB NOT NULL,
+                  status VARCHAR(20) DEFAULT 'pending',
+                  delivery_attempts INT DEFAULT 0,
+                  last_attempt_at TIMESTAMPTZ,
+                  delivered_at TIMESTAMPTZ,
+                  created_at TIMESTAMPTZ DEFAULT NOW()
+              );
+
+              CREATE INDEX IF NOT EXISTS idx_events_tpp_status ON events(tpp_id, status);
+              CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+
+              -- Payments (status store for PIS)
+              CREATE TABLE IF NOT EXISTS payments (
+                  payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  consent_id UUID NOT NULL REFERENCES consents(consent_id),
+                  tpp_id VARCHAR(100) NOT NULL,
+                  payment_type VARCHAR(50) NOT NULL,
+                  status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+                  instruction_identification VARCHAR(100),
+                  end_to_end_identification VARCHAR(100),
+                  amount DECIMAL(18,3) NOT NULL,
+                  currency VARCHAR(3) NOT NULL DEFAULT 'OMR',
+                  debtor_account JSONB,
+                  creditor_account JSONB,
+                  remittance_info JSONB,
+                  execution_time TIMESTAMPTZ,
+                  created_at TIMESTAMPTZ DEFAULT NOW(),
+                  updated_at TIMESTAMPTZ DEFAULT NOW()
+              );
+
+              CREATE INDEX IF NOT EXISTS idx_payments_consent ON payments(consent_id);
+              CREATE INDEX IF NOT EXISTS idx_payments_tpp ON payments(tpp_id);
+
+              -- Seed sandbox TPP
+              INSERT INTO tpp_registry (tpp_id, tpp_name, tpp_name_ar, registration_number, is_aisp, is_pisp, is_cisp, client_id, redirect_uris, status)
+              VALUES (
+                  'sandbox-tpp-demo',
+                  'Sandbox Demo TPP',
+                  'مزود خدمة تجريبي',
+                  'CBO-SANDBOX-001',
+                  true, true, true,
+                  'sandbox-tpp-demo',
+                  ARRAY['https://qantara.tnd.bankdhofar.com/sandbox/callback', 'http://localhost:8081/oauth/callback'],
+                  'Active'
+              ) ON CONFLICT (tpp_id) DO NOTHING;
+
+              SQL
+
+              echo "Database initialization complete."
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-db-credentials
+                  key: uri

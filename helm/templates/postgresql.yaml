@@ -1,0 +1,55 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: qantara-postgres
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/part-of: qantara
+spec:
+  instances: {{ .Values.postgresql.instances }}
+  imageName: harbor.cp.bankdhofar.com/dockerhub/cloudnative-pg/postgresql:17
+
+  postgresql:
+    parameters:
+      shared_buffers: "256MB"
+      max_connections: "100"
+      log_statement: "ddl"
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgresql.database }}
+      owner: {{ .Values.postgresql.owner }}
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+  storage:
+    size: {{ .Values.postgresql.storage }}
+    storageClass: oci-bv
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  monitoring:
+    enablePodMonitor: false
+---
+# Secret for database credentials (CNPG auto-generates, but we create a convenience secret)
+# The actual password comes from CNPG-generated secret: qantara-postgres-app
+# Services reference it via qantara-db-credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: qantara-db-credentials
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    cnpg.io/cluster: qantara-postgres
+    helm.sh/hook: post-install
+type: Opaque
+stringData:
+  uri: "postgresql://{{ .Values.postgresql.owner }}@qantara-postgres-rw:5432/{{ .Values.postgresql.database }}"
+{{- end }}

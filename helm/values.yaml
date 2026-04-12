@@ -1,0 +1,93 @@
+global:
+  domain: qantara.tnd.bankdhofar.com
+  namespace: ob-tnd
+  registry: harbor.cp.bankdhofar.com/qantara
+  imageTag: latest
+
+apiServer:
+  replicas: 2
+  image: ob-api-server
+  port: 8000
+  env:
+    ADAPTER_MODE: "mock"
+    CONSENT_SERVICE_URL: "http://ob-consent-service:8000"
+    LOG_LEVEL: "INFO"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+consentService:
+  replicas: 2
+  image: ob-consent-service
+  port: 8000
+  env:
+    LOG_LEVEL: "INFO"
+    CONSENT_DEFAULT_EXPIRY_DAYS: "180"
+    CONSENT_CLEANUP_INTERVAL: "3600"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+tppManager:
+  replicas: 2
+  image: ob-tpp-manager
+  port: 8000
+  env:
+    KEYCLOAK_URL: "http://keycloak.keycloak.svc.cluster.local:8080"
+    KEYCLOAK_REALM: "open-banking"
+    CONSENT_SERVICE_URL: "http://ob-consent-service:8000"
+    LOG_LEVEL: "info"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+eventService:
+  replicas: 1
+  image: ob-event-service
+  port: 8000
+  env:
+    WEBHOOK_MAX_RETRIES: "5"
+    WEBHOOK_TIMEOUT: "10"
+    LOG_LEVEL: "INFO"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+portal:
+  replicas: 1
+  image: ob-portal
+  port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+postgresql:
+  enabled: true
+  instances: 2
+  storage: 10Gi
+  database: qantara
+  owner: qantara
+
+redis:
+  enabled: true
+  storage: 1Gi

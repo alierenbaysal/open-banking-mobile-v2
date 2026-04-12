@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ob-event-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: ob-event-service
+    app.kubernetes.io/part-of: qantara
+spec:
+  replicas: {{ .Values.eventService.replicas }}
+  selector:
+    matchLabels:
+      app: ob-event-service
+  template:
+    metadata:
+      labels:
+        app: ob-event-service
+        app.kubernetes.io/part-of: qantara
+    spec:
+      containers:
+        - name: ob-event-service
+          image: {{ .Values.global.registry }}/{{ .Values.eventService.image }}:{{ .Values.global.imageTag }}
+          ports:
+            - containerPort: {{ .Values.eventService.port }}
+              protocol: TCP
+          env:
+            - name: SERVICE_PORT
+              value: "{{ .Values.eventService.port }}"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-db-credentials
+                  key: uri
+            - name: WEBHOOK_MAX_RETRIES
+              value: {{ .Values.eventService.env.WEBHOOK_MAX_RETRIES | quote }}
+            - name: WEBHOOK_TIMEOUT
+              value: {{ .Values.eventService.env.WEBHOOK_TIMEOUT | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.eventService.env.LOG_LEVEL | quote }}
+          resources:
+            {{- toYaml .Values.eventService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.eventService.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.eventService.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ob-event-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: ob-event-service
+spec:
+  selector:
+    app: ob-event-service
+  ports:
+    - port: 8000
+      targetPort: {{ .Values.eventService.port }}
+      protocol: TCP

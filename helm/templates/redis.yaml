@@ -1,0 +1,74 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qantara-redis
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qantara-redis
+    app.kubernetes.io/part-of: qantara
+spec:
+  serviceName: qantara-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qantara-redis
+  template:
+    metadata:
+      labels:
+        app: qantara-redis
+        app.kubernetes.io/part-of: qantara
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: redis
+          image: harbor.cp.bankdhofar.com/dockerhub/redis:7-alpine
+          ports:
+            - containerPort: 6379
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --maxmemory
+            - 128mb
+            - --maxmemory-policy
+            - allkeys-lru
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 192Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: oci-bv
+        resources:
+          requests:
+            storage: {{ .Values.redis.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qantara-redis
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qantara-redis
+spec:
+  selector:
+    app: qantara-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+{{- end }}

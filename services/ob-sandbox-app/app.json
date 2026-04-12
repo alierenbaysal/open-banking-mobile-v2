@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "BD Sandbox",
+    "slug": "ob-sandbox-app",
+    "scheme": "bdsandbox",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#4D9134"
+    },
+    "ios": {
+      "bundleIdentifier": "com.bankdhofar.sandbox",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.bankdhofar.sandbox",
+      "adaptiveIcon": {
+        "backgroundColor": "#4D9134"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

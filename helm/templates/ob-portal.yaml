@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ob-portal
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: ob-portal
+    app.kubernetes.io/part-of: qantara
+spec:
+  replicas: {{ .Values.portal.replicas }}
+  selector:
+    matchLabels:
+      app: ob-portal
+  template:
+    metadata:
+      labels:
+        app: ob-portal
+        app.kubernetes.io/part-of: qantara
+    spec:
+      containers:
+        - name: ob-portal
+          image: {{ .Values.global.registry }}/{{ .Values.portal.image }}:{{ .Values.global.imageTag }}
+          ports:
+            - containerPort: {{ .Values.portal.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.portal.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.portal.port }}
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.portal.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ob-portal
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: ob-portal
+spec:
+  selector:
+    app: ob-portal
+  ports:
+    - port: 80
+      targetPort: {{ .Values.portal.port }}
+      protocol: TCP

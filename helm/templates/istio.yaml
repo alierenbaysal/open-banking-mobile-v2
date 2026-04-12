@@ -1,0 +1,166 @@
+---
+# Gateway — TLS termination for qantara.tnd.bankdhofar.com
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: qantara-gateway
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: qantara-tls
+      hosts:
+        - {{ .Values.global.domain }}
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      tls:
+        httpsRedirect: true
+      hosts:
+        - {{ .Values.global.domain }}
+---
+# VirtualService — single-host, path-based routing
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: qantara
+  namespace: {{ .Values.global.namespace }}
+spec:
+  hosts:
+    - {{ .Values.global.domain }}
+  gateways:
+    - qantara-gateway
+  http:
+    # OBIE API endpoints → ob-api-server
+    - match:
+        - uri:
+            prefix: /open-banking/
+      route:
+        - destination:
+            host: ob-api-server
+            port:
+              number: 8000
+      headers:
+        response:
+          remove:
+            - x-envoy-upstream-service-time
+            - server
+      timeout: 30s
+      retries:
+        attempts: 2
+        retryOn: 5xx
+
+    # TPP Manager API → ob-tpp-manager
+    - match:
+        - uri:
+            prefix: /portal-api/
+      route:
+        - destination:
+            host: ob-tpp-manager
+            port:
+              number: 8000
+      timeout: 15s
+
+    # Webhook callbacks → ob-event-service
+    - match:
+        - uri:
+            prefix: /webhooks/
+      route:
+        - destination:
+            host: ob-event-service
+            port:
+              number: 8000
+      timeout: 10s
+
+    # Event endpoints (used by ob-api-server internally, also exposed)
+    - match:
+        - uri:
+            prefix: /events/
+      route:
+        - destination:
+            host: ob-event-service
+            port:
+              number: 8000
+
+    # Everything else → portal SPA
+    - route:
+        - destination:
+            host: ob-portal
+            port:
+              number: 80
+      timeout: 10s
+---
+# FAPI header injection — generate x-fapi-interaction-id if missing
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: qantara-fapi-headers
+  namespace: {{ .Values.global.namespace }}
+spec:
+  workloadSelector:
+    labels:
+      app: ob-api-server
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.lua
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+            inline_code: |
+              function envoy_on_request(handle)
+                local fapi_id = handle:headers():get("x-fapi-interaction-id")
+                if fapi_id == nil or fapi_id == "" then
+                  local uuid = string.format("%08x-%04x-%04x-%04x-%012x",
+                    math.random(0, 0xFFFFFFFF),
+                    math.random(0, 0xFFFF),
+                    math.random(0, 0x0FFF) + 0x4000,
+                    math.random(0, 0x3FFF) + 0x8000,
+                    math.random(0, 0xFFFFFFFFFFFF))
+                  handle:headers():add("x-fapi-interaction-id", uuid)
+                end
+              end
+
+              function envoy_on_response(handle)
+                local fapi_id = handle:headers():get("x-fapi-interaction-id")
+                if fapi_id then
+                  handle:headers():add("x-fapi-interaction-id", fapi_id)
+                end
+              end
+---
+# Remove server fingerprint headers from all responses
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: qantara-remove-server-header
+  namespace: {{ .Values.global.namespace }}
+spec:
+  configPatches:
+    - applyTo: NETWORK_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+      patch:
+        operation: MERGE
+        value:
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            server_header_transformation: PASS_THROUGH

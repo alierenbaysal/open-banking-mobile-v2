@@ -1,0 +1,92 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  REGISTRY: harbor.cp.bankdhofar.com/qantara
+  KUBE_CONTEXT: oci-mct-tnd-rtz
+  NAMESPACE: ob-tnd
+
+# --- Build stage ---
+
+.build_template: &build_template
+  stage: build
+  image:
+    name: harbor.cp.bankdhofar.com/dockerhub/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - >-
+      echo "{\"auths\":{\"${REGISTRY}\":{\"auth\":\"$(printf '%s:%s' "${HARBOR_USER}" "${HARBOR_PASSWORD}" | base64)\"}}}"
+      > /kaniko/.docker/config.json
+    - >-
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/${BUILD_CONTEXT}"
+      --dockerfile "${CI_PROJECT_DIR}/${BUILD_CONTEXT}/Dockerfile"
+      --destination "${REGISTRY}/${IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}"
+      --destination "${REGISTRY}/${IMAGE_NAME}:latest"
+      --cache=true
+      --cache-repo="${REGISTRY}/${IMAGE_NAME}/cache"
+
+build-ob-api-server:
+  <<: *build_template
+  variables:
+    BUILD_CONTEXT: services/ob-api-server
+    IMAGE_NAME: ob-api-server
+  only:
+    changes:
+      - services/ob-api-server/**/*
+
+build-ob-consent-service:
+  <<: *build_template
+  variables:
+    BUILD_CONTEXT: services/ob-consent-service
+    IMAGE_NAME: ob-consent-service
+  only:
+    changes:
+      - services/ob-consent-service/**/*
+
+build-ob-tpp-manager:
+  <<: *build_template
+  variables:
+    BUILD_CONTEXT: services/ob-tpp-manager
+    IMAGE_NAME: ob-tpp-manager
+  only:
+    changes:
+      - services/ob-tpp-manager/**/*
+
+build-ob-event-service:
+  <<: *build_template
+  variables:
+    BUILD_CONTEXT: services/ob-event-service
+    IMAGE_NAME: ob-event-service
+  only:
+    changes:
+      - services/ob-event-service/**/*
+
+build-ob-portal:
+  <<: *build_template
+  variables:
+    BUILD_CONTEXT: services/ob-portal
+    IMAGE_NAME: ob-portal
+  only:
+    changes:
+      - services/ob-portal/**/*
+
+# --- Deploy stage ---
+
+deploy-tnd:
+  stage: deploy
+  image: harbor.cp.bankdhofar.com/dockerhub/alpine/helm:3.14.0
+  script:
+    - helm upgrade --install qantara ./helm
+      --namespace ${NAMESPACE}
+      --create-namespace
+      --set global.imageTag=${CI_COMMIT_SHORT_SHA}
+      --wait
+      --timeout 300s
+  environment:
+    name: tnd
+    url: https://qantara.tnd.bankdhofar.com
+  only:
+    - main

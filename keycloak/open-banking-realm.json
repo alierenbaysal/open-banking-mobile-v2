@@ -1,0 +1,289 @@
+{
+  "realm": "open-banking",
+  "enabled": true,
+  "sslRequired": "all",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "defaultSignatureAlgorithm": "PS256",
+  "accessTokenLifespan": 300,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+
+  "clientScopes": [
+    {
+      "name": "accounts",
+      "description": "Access to account information (AIS)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "consent.screen.text": "Access your account information",
+        "display.on.consent.screen": "true",
+        "include.in.token.scope": "true"
+      }
+    },
+    {
+      "name": "payments",
+      "description": "Initiate payments (PIS)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "consent.screen.text": "Initiate payments from your accounts",
+        "display.on.consent.screen": "true",
+        "include.in.token.scope": "true"
+      }
+    },
+    {
+      "name": "fundsconfirmations",
+      "description": "Confirm availability of funds (CBPII)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "consent.screen.text": "Check if funds are available",
+        "display.on.consent.screen": "true",
+        "include.in.token.scope": "true"
+      }
+    }
+  ],
+
+  "clientProfiles": {
+    "profiles": [
+      {
+        "name": "fapi-2-security-profile",
+        "description": "FAPI 2.0 Security Profile for Open Banking TPPs",
+        "executors": [
+          {
+            "executor": "secure-client-authenticator-executor",
+            "configuration": {
+              "allowed-client-authenticators": [
+                "client-jwt",
+                "client-x509"
+              ]
+            }
+          },
+          {
+            "executor": "pkce-enforcer-executor",
+            "configuration": {
+              "auto-configure": true
+            }
+          },
+          {
+            "executor": "secure-request-object-executor",
+            "configuration": {
+              "available-period": 60,
+              "verify-nbf": true
+            }
+          },
+          {
+            "executor": "holder-of-key-enforcer-executor",
+            "configuration": {}
+          },
+          {
+            "executor": "secure-response-type-executor",
+            "configuration": {
+              "auto-configure": true,
+              "allow-token-response-type": false
+            }
+          },
+          {
+            "executor": "secure-signing-algorithm-executor",
+            "configuration": {
+              "default-algorithm": "PS256"
+            }
+          }
+        ]
+      },
+      {
+        "name": "fapi-2-sandbox-profile",
+        "description": "Relaxed FAPI profile for sandbox testing — no mTLS, no request objects",
+        "executors": [
+          {
+            "executor": "pkce-enforcer-executor",
+            "configuration": {
+              "auto-configure": true
+            }
+          },
+          {
+            "executor": "secure-signing-algorithm-executor",
+            "configuration": {
+              "default-algorithm": "PS256"
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  "clientPolicies": {
+    "policies": [
+      {
+        "name": "fapi-2-production-policy",
+        "description": "Enforce FAPI 2.0 for production TPP clients",
+        "enabled": false,
+        "conditions": [
+          {
+            "condition": "client-roles",
+            "configuration": {
+              "roles": ["production-tpp"]
+            }
+          }
+        ],
+        "profiles": ["fapi-2-security-profile"]
+      },
+      {
+        "name": "fapi-2-sandbox-policy",
+        "description": "Relaxed FAPI for sandbox TPP clients",
+        "enabled": true,
+        "conditions": [
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "scopes": ["accounts", "payments", "fundsconfirmations"]
+            }
+          }
+        ],
+        "profiles": ["fapi-2-sandbox-profile"]
+      }
+    ]
+  },
+
+  "components": {
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "name": "rsa-sig-ps256",
+        "providerId": "rsa-generated",
+        "config": {
+          "priority": ["100"],
+          "algorithm": ["PS256"],
+          "keySize": ["2048"]
+        }
+      }
+    ]
+  },
+
+  "roles": {
+    "realm": [
+      {
+        "name": "tpp-developer",
+        "description": "TPP developer — can register applications and access sandbox"
+      },
+      {
+        "name": "production-tpp",
+        "description": "CBO-verified TPP — production access with full FAPI enforcement"
+      },
+      {
+        "name": "qantara-admin",
+        "description": "Qantara platform administrator"
+      }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "qantara-admin-cli",
+      "name": "Qantara Admin CLI",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "fullScopeAllowed": true,
+      "description": "Service account for ob-tpp-manager to provision TPP clients"
+    },
+    {
+      "clientId": "qantara-portal",
+      "name": "Qantara Developer Portal",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "rootUrl": "https://qantara.tnd.bankdhofar.com",
+      "redirectUris": [
+        "https://qantara.tnd.bankdhofar.com/*"
+      ],
+      "webOrigins": [
+        "https://qantara.tnd.bankdhofar.com"
+      ],
+      "defaultClientScopes": ["openid", "profile", "email"],
+      "description": "Public OIDC client for the Qantara developer portal SPA"
+    },
+    {
+      "clientId": "sandbox-tpp-demo",
+      "name": "Sandbox Demo TPP",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "https://qantara.tnd.bankdhofar.com/sandbox/callback",
+        "exp://*/--/oauth/callback",
+        "http://localhost:8081/oauth/callback"
+      ],
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["accounts", "payments", "fundsconfirmations"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "use.refresh.tokens": "true",
+        "token.endpoint.auth.signing.alg": "PS256",
+        "id.token.signed.response.alg": "PS256"
+      },
+      "fullScopeAllowed": false,
+      "description": "Pre-configured sandbox TPP for testing and demos"
+    }
+  ],
+
+  "users": [
+    {
+      "username": "sandbox-customer-1",
+      "enabled": true,
+      "email": "customer1@sandbox.bankdhofar.com",
+      "firstName": "Ahmed",
+      "lastName": "Al-Balushi",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sandbox-customer-1-test",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "customer_id": ["CUST-001"],
+        "accounts": ["OM02DHOF0000000100001234", "OM02DHOF0000000100005678"]
+      }
+    },
+    {
+      "username": "sandbox-customer-2",
+      "enabled": true,
+      "email": "customer2@sandbox.bankdhofar.com",
+      "firstName": "Fatima",
+      "lastName": "Al-Rashdi",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sandbox-customer-2-test",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "customer_id": ["CUST-002"],
+        "accounts": ["OM02DHOF0000000200001234"]
+      }
+    }
+  ]
+}
