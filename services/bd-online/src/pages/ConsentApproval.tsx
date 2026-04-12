@@ -39,7 +39,7 @@ import {
   IconX,
   IconBuildingBank,
   IconArrowRight,
-  IconCurrencyRial,
+  IconCurrencyRiyal,
 } from '@tabler/icons-react';
 import AccountPicker from '@/components/AccountPicker';
 import PermissionDisplay from '@/components/PermissionDisplay';
@@ -281,7 +281,8 @@ export default function ConsentApproval() {
   const paymentAmount = consent.payment_details?.instructed_amount as
     | { amount: string; currency: string }
     | undefined;
-  const creditorName = consent.payment_details?.creditor_account?.name as string | undefined;
+  const creditorAccount = consent.payment_details?.creditor_account as Record<string, string> | undefined;
+  const creditorName = creditorAccount?.name;
   const paymentRef = consent.payment_details?.reference as string | undefined;
 
   return (
@@ -368,7 +369,7 @@ export default function ConsentApproval() {
         <Card withBorder radius="md" padding="md" style={{ borderColor: '#e8590c' }}>
           <Stack gap="sm">
             <Group gap="xs">
-              <IconCurrencyRial size={20} color="var(--mantine-color-orange-6)" />
+              <IconCurrencyRiyal size={20} color="var(--mantine-color-orange-6)" />
               <Text fw={600}>Payment Details / \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u062F\u0641\u0639</Text>
             </Group>
             <Divider />
