@@ -8,7 +8,7 @@ COPY package.json ./
 RUN npm install
 ARG CACHE_BUST=1
 COPY . .
-RUN rm -rf node_modules/.vite node_modules/.cache tsconfig.tsbuildinfo dist && echo "build: $CACHE_BUST" && npm run build
+RUN echo "=== accounts.ts first 5 lines ===" && head -5 src/utils/accounts.ts && echo "=== grep banking ===" && grep -c "banking" src/utils/accounts.ts && echo "=== build ===" && npm run build
 
 FROM harbor.cp.bankdhofar.com/dockerhub/python:3.12-slim
 RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
