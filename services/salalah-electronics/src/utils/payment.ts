@@ -1,15 +1,15 @@
 /**
- * Payment flow utilities for Salalah Electronics.
+ * Payment flow utilities for Salalah Souq.
  *
- * Salalah Electronics is a MERCHANT that uses Sadad as its payment gateway.
+ * Salalah Souq is a MERCHANT that uses Sadad as its payment gateway.
  * Sadad handles the OBIE PISP flow via Bank Dhofar Open Banking.
  *
  * Flow:
- * 1. Customer checks out at Salalah Electronics
+ * 1. Customer checks out at Salalah Souq
  * 2. Merchant creates domestic-payment consent via consent-service (POST /consents)
  * 3. Customer is redirected to BD Online for payment approval
- * 4. BD Online executes payment on approval, redirects back to Salalah Electronics
- * 5. Salalah Electronics shows payment receipt
+ * 4. BD Online executes payment on approval, redirects back to Salalah Souq
+ * 5. Salalah Souq shows payment receipt
  */
 
 const CONSENT_SERVICE_URL = '/api/consent';
@@ -17,14 +17,14 @@ const BD_ONLINE_BASE = 'https://banking.tnd.bankdhofar.com';
 const SE_REDIRECT_URI = 'https://salalah.tnd.bankdhofar.com/payment/callback';
 const CLIENT_ID = 'sadad-payment-gateway';
 
-const STATE_KEY = 'se_payment_state';
-const CONSENT_KEY = 'se_consent_id';
-const ORDER_REF_KEY = 'se_order_ref';
+const STATE_KEY = 'ss_payment_state';
+const CONSENT_KEY = 'ss_consent_id';
+const ORDER_REF_KEY = 'ss_order_ref';
 
 /** Merchant account details */
 export const MERCHANT = {
-  name: 'Salalah Electronics',
-  nameAr: '\u0635\u0644\u0627\u0644\u0629 \u0644\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A',
+  name: 'Salalah Souq',
+  nameAr: '\u0635\u0644\u0627\u0644\u0629 \u0633\u0648\u0642',
   iban: 'OM02DHOF0001020099887701',
   accountId: 'DHOF-20001',
 };
@@ -40,7 +40,7 @@ export interface ConsentResponse {
  */
 export function generateOrderRef(): string {
   const rand = Math.floor(100000 + Math.random() * 900000);
-  return `SE-INV-${rand}`;
+  return `SS-INV-${rand}`;
 }
 
 /**

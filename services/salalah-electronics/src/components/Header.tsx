@@ -30,7 +30,7 @@ export default function Header({ onCartOpen }: HeaderProps) {
           style={{ cursor: 'pointer' }}
           onClick={() => navigate('/')}
         >
-          {/* SE logo circle */}
+          {/* SS logo circle */}
           <Box
             style={{
               width: 40,
@@ -43,20 +43,20 @@ export default function Header({ onCartOpen }: HeaderProps) {
             }}
           >
             <Text c="white" fw={700} size="sm">
-              SE
+              SS
             </Text>
           </Box>
           <Box>
             <Group gap={8} align="baseline">
               <Text fw={700} size="lg" style={{ color: '#D35400' }}>
-                Salalah Electronics
+                Salalah Souq
               </Text>
               <Text size="sm" c="dimmed" fw={500}>
-                {'\u0635\u0644\u0627\u0644\u0629 \u0644\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A'}
+                {'\u0635\u0644\u0627\u0644\u0629 \u0633\u0648\u0642'}
               </Text>
             </Group>
             <Text size="xs" c="dimmed" mt={-4}>
-              Oman's Trusted Electronics Store
+              Oman's Premium Gift & Heritage Store
             </Text>
           </Box>
         </Group>

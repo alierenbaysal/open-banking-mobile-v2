@@ -47,7 +47,7 @@ export default function Store() {
               Authentic Omani Products
             </Badge>
             <Title order={1} c="white" size="2.5rem">
-              Salalah Electronics
+              Salalah Souq
             </Title>
             <Text
               size="xl"
@@ -56,14 +56,14 @@ export default function Store() {
               dir="rtl"
               fw={500}
             >
-              {'\u0635\u0644\u0627\u0644\u0629 \u0644\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A'}
+              {'\u0635\u0644\u0627\u0644\u0629 \u0633\u0648\u0642'}
             </Text>
             <Text size="md" c="white" style={{ opacity: 0.85 }} maw={500}>
-              Oman's Trusted Electronics Store.
+              Oman's Premium Gift & Heritage Store.
               Pay instantly from your Bank Dhofar account via Sadad.
             </Text>
             <Text size="sm" c="white" style={{ opacity: 0.7 }} dir="rtl">
-              {'\u0645\u062A\u062C\u0631 \u0639\u064F\u0645\u0627\u0646 \u0627\u0644\u0645\u0648\u062B\u0648\u0642 \u0644\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A'}
+              {'\u0645\u062A\u062C\u0631 \u0639\u064F\u0645\u0627\u0646 \u0627\u0644\u0641\u0627\u062E\u0631 \u0644\u0644\u0647\u062F\u0627\u064A\u0627 \u0648\u0627\u0644\u062A\u0631\u0627\u062B'}
             </Text>
           </Stack>
         </Container>
@@ -136,7 +136,7 @@ export default function Store() {
           <Group justify="space-between" align="center">
             <Box>
               <Text size="sm" c="dimmed">
-                Salalah Electronics / {'\u0635\u0644\u0627\u0644\u0629 \u0644\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A'}
+                Salalah Souq / {'\u0635\u0644\u0627\u0644\u0629 \u0633\u0648\u0642'}
               </Text>
               <Text size="xs" c="dimmed" mt={2}>
                 Payments powered by Sadad ({'\u0633\u062F\u0627\u062F'}) Payment Gateway

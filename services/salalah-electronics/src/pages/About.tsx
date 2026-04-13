@@ -66,12 +66,12 @@ export default function About() {
               }}
             >
               <Text c="white" fw={700} size="xl">
-                SE
+                SS
               </Text>
             </Box>
-            <Title order={2}>Salalah Electronics</Title>
+            <Title order={2}>Salalah Souq</Title>
             <Text size="lg" c="dimmed" dir="rtl" fw={500}>
-              {'\u0635\u0644\u0627\u0644\u0629 \u0644\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A'}
+              {'\u0635\u0644\u0627\u0644\u0629 \u0633\u0648\u0642'}
             </Text>
             <Badge color="orange" variant="light" size="lg">
               Est. 2015 &mdash; Salalah, Oman
@@ -79,14 +79,14 @@ export default function About() {
           </Stack>
 
           <Text size="md" ta="center" maw={500} mx="auto" mb="lg">
-            Salalah Electronics is Oman's trusted destination for authentic Omani
-            products and premium electronics. We bring the rich heritage of Dhofar
-            to your doorstep with genuine frankincense, traditional coffee sets,
-            and artisan-crafted goods.
+            Salalah Souq is Oman's premium destination for authentic gifts and
+            heritage products. We bring the rich traditions of Dhofar to your
+            doorstep with genuine frankincense, traditional coffee sets, handcrafted
+            khanjars, and artisan-crafted goods from across the Sultanate.
           </Text>
 
           <Text size="md" ta="center" maw={500} mx="auto" c="dimmed" dir="rtl">
-            {'\u0635\u0644\u0627\u0644\u0629 \u0644\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A \u0647\u064A \u0627\u0644\u0648\u062C\u0647\u0629 \u0627\u0644\u0645\u0648\u062B\u0648\u0642\u0629 \u0641\u064A \u0639\u064F\u0645\u0627\u0646 \u0644\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0627\u0644\u0639\u0645\u0627\u0646\u064A\u0629 \u0627\u0644\u0623\u0635\u064A\u0644\u0629 \u0648\u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A \u0627\u0644\u0641\u0627\u062E\u0631\u0629.'}
+            {'\u0635\u0644\u0627\u0644\u0629 \u0633\u0648\u0642 \u0647\u064A \u0627\u0644\u0648\u062C\u0647\u0629 \u0627\u0644\u0641\u0627\u062E\u0631\u0629 \u0641\u064A \u0639\u064F\u0645\u0627\u0646 \u0644\u0644\u0647\u062F\u0627\u064A\u0627 \u0627\u0644\u0623\u0635\u064A\u0644\u0629 \u0648\u0645\u0646\u062A\u062C\u0627\u062A \u0627\u0644\u062A\u0631\u0627\u062B \u0627\u0644\u0639\u0645\u0627\u0646\u064A.'}
           </Text>
         </Paper>
 
@@ -147,14 +147,14 @@ export default function About() {
             </Group>
             <Group justify="space-between">
               <Text size="sm" c="dimmed">Email</Text>
-              <Text size="sm" fw={500}>info@salalah-electronics.com</Text>
+              <Text size="sm" fw={500}>info@salalah-souq.com</Text>
             </Group>
           </Stack>
         </Paper>
 
         {/* Footer */}
         <Text size="xs" c="dimmed" ta="center" mt="xl">
-          Salalah Electronics / {'\u0635\u0644\u0627\u0644\u0629 \u0644\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0627\u062A'} — Payments powered by Sadad
+          Salalah Souq / {'\u0635\u0644\u0627\u0644\u0629 \u0633\u0648\u0642'} — Payments powered by Sadad
         </Text>
       </Container>
     </Box>

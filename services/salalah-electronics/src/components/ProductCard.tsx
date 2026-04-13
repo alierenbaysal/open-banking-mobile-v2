@@ -46,17 +46,24 @@ export default function ProductCard({ product }: ProductCardProps) {
     >
       <Box
         style={{
-          height: 120,
+          height: 140,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           background: 'linear-gradient(135deg, #fff4e6, #ffe8cc)',
           borderRadius: 8,
           marginBottom: 16,
-          fontSize: 56,
         }}
       >
-        {product.emoji}
+        {product.image ? (
+          <img
+            src={product.image}
+            alt={product.name}
+            style={{ width: 120, height: 120, objectFit: 'contain' }}
+          />
+        ) : (
+          <span style={{ fontSize: 56 }}>{product.emoji}</span>
+        )}
       </Box>
 
       <Stack gap={4} style={{ flex: 1 }}>
