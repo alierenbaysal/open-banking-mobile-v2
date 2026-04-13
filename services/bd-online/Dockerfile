@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y curl && \
 WORKDIR /app
 COPY package.json ./
 RUN npm install
-COPY . .
 ARG CACHE_BUST=1
+COPY . .
 RUN echo "build: $CACHE_BUST" && npm run build
 
 FROM harbor.cp.bankdhofar.com/dockerhub/python:3.12-slim
