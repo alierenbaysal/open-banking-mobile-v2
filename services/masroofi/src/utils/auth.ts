@@ -1,7 +1,9 @@
 /**
- * Simple local auth for Masroofi's own user accounts.
- * Masroofi has its own users separate from Bank Dhofar.
- * In production this would be a real backend — here we use localStorage.
+ * Masroofi user authentication via the banking API.
+ * User accounts are stored in PostgreSQL (not localStorage) so they
+ * survive browser cache clears and work across devices.
+ *
+ * Only the *session* (current login) is kept in sessionStorage.
  */
 
 export interface MasroofiUser {
@@ -10,95 +12,77 @@ export interface MasroofiUser {
   createdAt: string;
 }
 
-const USERS_KEY = 'masroofi_users';
 const SESSION_KEY = 'masroofi_session';
 
-export interface UserRecord {
-  password: string;
-  name: string;
-  createdAt: string;
-  consent_id?: string;
-  bank_token?: string;
-}
-
-export function getUsers(): Record<string, UserRecord> {
+export async function signup(
+  email: string,
+  password: string,
+  name: string,
+): Promise<{ ok: true; user: MasroofiUser } | { ok: false; error: string }> {
   try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+    const resp = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, name }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => null);
+      const detail = body?.detail || 'Registration failed';
+      return { ok: false, error: detail };
+    }
+
+    const user = await resp.json();
+    sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ email, name, createdAt: user.created_at }),
+    );
+    return { ok: true, user: { email, name, createdAt: user.created_at } };
   } catch {
-    return {};
+    return { ok: false, error: 'Network error — please try again' };
   }
 }
 
-export function saveUsers(users: Record<string, UserRecord>): void {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
+export async function login(
+  email: string,
+  password: string,
+): Promise<{ ok: true; user: MasroofiUser } | { ok: false; error: string }> {
+  try {
+    const resp = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
 
-/**
- * Update fields on the current user's record (e.g. bank connection).
- */
-export function updateCurrentUserRecord(fields: Partial<Pick<UserRecord, 'consent_id' | 'bank_token'>>): void {
-  const user = getCurrentUser();
-  if (!user) return;
-  const users = getUsers();
-  const entry = users[user.email];
-  if (!entry) return;
-  Object.assign(entry, fields);
-  saveUsers(users);
-}
+    if (!resp.ok) {
+      return { ok: false, error: 'Invalid email or password' };
+    }
 
-/**
- * Get a field from the current user's stored record.
- */
-export function getCurrentUserRecord(): UserRecord | null {
-  const user = getCurrentUser();
-  if (!user) return null;
-  const users = getUsers();
-  return users[user.email] || null;
-}
+    const user = await resp.json();
+    sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ email, name: user.name, createdAt: user.created_at }),
+    );
 
-export function signup(email: string, password: string, name: string): { ok: true; user: MasroofiUser } | { ok: false; error: string } {
-  const users = getUsers();
-  if (users[email]) {
-    return { ok: false, error: 'An account with this email already exists' };
+    // Restore bank connection if it exists in the DB record
+    if (user.consent_id) {
+      localStorage.setItem('masroofi_consent_id', user.consent_id);
+      localStorage.setItem('masroofi_bank_token', user.bank_token || user.consent_id);
+    }
+
+    return { ok: true, user: { email, name: user.name, createdAt: user.created_at } };
+  } catch {
+    return { ok: false, error: 'Network error — please try again' };
   }
-  if (password.length < 6) {
-    return { ok: false, error: 'Password must be at least 6 characters' };
-  }
-  const createdAt = new Date().toISOString();
-  users[email] = { password, name, createdAt };
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  const user: MasroofiUser = { email, name, createdAt };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-  return { ok: true, user };
-}
-
-export function login(email: string, password: string): { ok: true; user: MasroofiUser } | { ok: false; error: string } {
-  const users = getUsers();
-  const entry = users[email];
-  if (!entry || entry.password !== password) {
-    return { ok: false, error: 'Invalid email or password' };
-  }
-  const user: MasroofiUser = { email, name: entry.name, createdAt: entry.createdAt };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-
-  // Restore bank connection from user record if present
-  if (entry.bank_token) {
-    localStorage.setItem('masroofi_bank_token', entry.bank_token);
-  }
-  if (entry.consent_id) {
-    localStorage.setItem('masroofi_consent_id', entry.consent_id);
-  }
-
-  return { ok: true, user };
 }
 
 export function logout(): void {
-  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
 }
 
 export function getCurrentUser(): MasroofiUser | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = sessionStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;

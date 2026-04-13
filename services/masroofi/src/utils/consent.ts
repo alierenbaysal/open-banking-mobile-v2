@@ -8,7 +8,7 @@
  * 4. Exchange code for access token (or use consent_id directly for demo)
  */
 
-import { updateCurrentUserRecord, getCurrentUserRecord } from './auth';
+import { getCurrentUser } from './auth';
 
 const CONSENT_SERVICE_URL = '/api/consent';
 const BD_ONLINE_BASE = 'https://banking.tnd.bankdhofar.com';
@@ -124,12 +124,25 @@ export function validateState(receivedState: string): boolean {
 
 /**
  * Store the access token and consent ID after successful auth.
- * Also persists into the user record so it survives page refresh / re-login.
+ * Persists to the DB so bank connection survives cache clears.
  */
 export function storeCredentials(token: string, consentId: string): void {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(CONSENT_KEY, consentId);
-  updateCurrentUserRecord({ bank_token: token, consent_id: consentId });
+
+  // Persist to DB so bank connection survives browser cache clears
+  const user = getCurrentUser();
+  if (user) {
+    fetch('/api/auth/update-bank', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user.email,
+        consent_id: consentId,
+        bank_token: token,
+      }),
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -148,28 +161,30 @@ export function getStoredConsentId(): string | null {
 
 /**
  * Check if a bank connection is active.
- * Checks localStorage first, then falls back to the user record.
+ * Bank credentials are restored from DB at login time into localStorage.
  */
 export function isBankConnected(): boolean {
-  if (getStoredToken() !== null && getStoredConsentId() !== null) {
-    return true;
-  }
-  // Fallback: check user record (survives cache clears within same login)
-  const record = getCurrentUserRecord();
-  if (record?.bank_token && record?.consent_id) {
-    // Restore to localStorage for this session
-    localStorage.setItem(TOKEN_KEY, record.bank_token);
-    localStorage.setItem(CONSENT_KEY, record.consent_id);
-    return true;
-  }
-  return false;
+  return getStoredToken() !== null && getStoredConsentId() !== null;
 }
 
 /**
- * Disconnect bank (clear stored credentials from localStorage and user record).
+ * Disconnect bank (clear stored credentials from localStorage and DB).
  */
 export function disconnectBank(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(CONSENT_KEY);
-  updateCurrentUserRecord({ bank_token: undefined, consent_id: undefined });
+
+  // Clear from DB as well
+  const user = getCurrentUser();
+  if (user) {
+    fetch('/api/auth/update-bank', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user.email,
+        consent_id: '',
+        bank_token: '',
+      }),
+    }).catch(() => {});
+  }
 }

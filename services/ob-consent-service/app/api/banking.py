@@ -59,6 +59,23 @@ class AddBeneficiaryRequest(BaseModel):
     nickname: str = Field("", max_length=100)
 
 
+class MasroofiRegisterRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=6, max_length=255)
+    name: str = Field(..., min_length=1, max_length=100)
+
+
+class MasroofiLoginRequest(BaseModel):
+    email: str = Field(..., min_length=1, max_length=255)
+    password: str = Field(..., min_length=1, max_length=255)
+
+
+class MasroofiUpdateBankRequest(BaseModel):
+    email: str = Field(..., min_length=1, max_length=255)
+    consent_id: str = Field("", max_length=100)
+    bank_token: str = Field("", max_length=500)
+
+
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 def _row_to_dict(row) -> dict[str, Any]:
@@ -263,6 +280,108 @@ async def delete_beneficiary(beneficiary_id: str) -> None:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Beneficiary {beneficiary_id} not found",
             )
+
+
+# ── Masroofi Users ─────────────────────────────────────────────────────
+
+_MASROOFI_TABLE_CREATED = False
+
+
+async def _ensure_masroofi_table(conn) -> None:
+    """Create the masroofi_users table if it doesn't exist (idempotent)."""
+    global _MASROOFI_TABLE_CREATED
+    if _MASROOFI_TABLE_CREATED:
+        return
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS masroofi_users (
+            email VARCHAR(255) PRIMARY KEY,
+            password VARCHAR(255) NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            consent_id VARCHAR(100),
+            bank_token VARCHAR(500),
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    _MASROOFI_TABLE_CREATED = True
+
+
+@router.post("/masroofi/register", status_code=status.HTTP_201_CREATED)
+async def masroofi_register(req: MasroofiRegisterRequest) -> dict[str, Any]:
+    """Register a new Masroofi user account."""
+    async with acquire() as conn:
+        await _ensure_masroofi_table(conn)
+
+        existing = await conn.fetchrow(
+            "SELECT email FROM masroofi_users WHERE email = $1",
+            req.email,
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists",
+            )
+
+        now = datetime.now(_TZ_OMAN)
+        await conn.execute(
+            """INSERT INTO masroofi_users (email, password, name, created_at)
+               VALUES ($1, $2, $3, $4)""",
+            req.email,
+            req.password,
+            req.name,
+            now,
+        )
+
+    return {
+        "email": req.email,
+        "name": req.name,
+        "created_at": now.isoformat(),
+    }
+
+
+@router.post("/masroofi/login")
+async def masroofi_login(req: MasroofiLoginRequest) -> dict[str, Any]:
+    """Login to a Masroofi user account."""
+    async with acquire() as conn:
+        await _ensure_masroofi_table(conn)
+
+        row = await conn.fetchrow(
+            "SELECT email, password, name, consent_id, bank_token, created_at FROM masroofi_users WHERE email = $1",
+            req.email,
+        )
+
+    if not row or row["password"] != req.password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    result = _row_to_dict(row)
+    del result["password"]
+    return result
+
+
+@router.post("/masroofi/update-bank")
+async def masroofi_update_bank(req: MasroofiUpdateBankRequest) -> dict[str, Any]:
+    """Update a Masroofi user's bank connection details."""
+    async with acquire() as conn:
+        await _ensure_masroofi_table(conn)
+
+        result = await conn.execute(
+            """UPDATE masroofi_users
+               SET consent_id = $1, bank_token = $2
+               WHERE email = $3""",
+            req.consent_id or None,
+            req.bank_token or None,
+            req.email,
+        )
+
+    if result == "UPDATE 0":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Masroofi user {req.email} not found",
+        )
+
+    return {"email": req.email, "status": "updated"}
 
 
 # ── Transfers ───────────────────────────────────────────────────────────

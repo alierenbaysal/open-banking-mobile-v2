@@ -80,9 +80,37 @@ export default function PaymentCallback() {
         setOrderRef(storedOrderRef);
         setPaymentAmount(total);
 
-        // Simulate brief processing delay (in production, the payment was already
-        // executed on BD Online's side when the customer approved the consent)
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        // 1. Fetch consent details to find the customer's source account
+        const consentResp = await fetch(`/api/consent/${storedConsentId}`);
+        if (!consentResp.ok) {
+          throw new Error('Failed to retrieve consent details');
+        }
+        const consent = await consentResp.json();
+        const sourceAccount = consent.selected_accounts?.[0];
+
+        if (!sourceAccount) {
+          throw new Error('No bank account was selected during consent approval');
+        }
+
+        // 2. Execute the actual transfer: debit customer, credit merchant
+        const transferResp = await fetch('/api/banking/transfers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source_account_id: sourceAccount,
+            target_account_id: MERCHANT.accountId,
+            amount: parseFloat(total.toFixed(3)),
+            currency: 'OMR',
+            customer_id: consent.customer_id,
+            reference: storedOrderRef,
+            description: `Payment to Salalah Souq - ${storedOrderRef}`,
+          }),
+        });
+
+        if (!transferResp.ok) {
+          const errBody = await transferResp.json().catch(() => null);
+          throw new Error(errBody?.detail || 'Payment transfer failed');
+        }
 
         // Payment confirmed -- clear cart and payment context
         clear();

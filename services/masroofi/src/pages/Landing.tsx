@@ -74,9 +74,9 @@ export default function Landing() {
     return null;
   }
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     setError('');
-    const result = signup(email, password, name);
+    const result = await signup(email, password, name);
     if (result.ok) {
       navigate('/dashboard');
     } else {
@@ -84,9 +84,9 @@ export default function Landing() {
     }
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError('');
-    const result = login(email, password);
+    const result = await login(email, password);
     if (result.ok) {
       navigate('/dashboard');
     } else {

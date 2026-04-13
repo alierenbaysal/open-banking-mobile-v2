@@ -9,6 +9,7 @@ import {
   Loader,
   Badge,
   Alert,
+  ThemeIcon,
 } from '@mantine/core';
 import {
   IconBuildingBank,
@@ -16,6 +17,7 @@ import {
   IconBrandApple,
   IconLock,
   IconAlertCircle,
+  IconShieldCheck,
 } from '@tabler/icons-react';
 import { formatOMR } from '@/utils/products';
 import {
@@ -65,14 +67,18 @@ export default function PaymentMethods({ total, disabled }: PaymentMethodsProps)
   return (
     <Paper shadow="sm" radius="md" p="lg" withBorder>
       <Stack gap="md">
-        <Box>
-          <Text fw={600} size="lg">
-            Choose Payment Method
-          </Text>
-          <Text size="sm" c="dimmed" dir="rtl">
-            {'\u0627\u062E\u062A\u0631 \u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062F\u0641\u0639'}
-          </Text>
-        </Box>
+        <Group gap="xs" mb="md">
+          <ThemeIcon size="lg" color="blue" variant="light" radius="xl">
+            <IconShieldCheck size={20} />
+          </ThemeIcon>
+          <Box>
+            <Text fw={700} size="md">Sadad Payment Gateway</Text>
+            <Text size="xs" c="dimmed">{'\u0633\u062F\u0627\u062F \u2014 \u0628\u0648\u0627\u0628\u0629 \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u0622\u0645\u0646\u0629'}</Text>
+          </Box>
+        </Group>
+        <Text size="sm" c="dimmed" mb="md">
+          Choose your payment method / {'\u0627\u062E\u062A\u0631 \u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062F\u0641\u0639'}
+        </Text>
 
         {error && (
           <Alert
