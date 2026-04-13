@@ -3,7 +3,7 @@
  * This avoids the state management issues of oidc-client-ts.
  */
 
-const SSO_BASE = 'https://sso.tnd.bankdhofar.com/realms/open-banking';
+const SSO_BASE = 'https://keycloak.uat.bankdhofar.com/realms/open-banking';
 const TOKEN_PROXY = '/auth/realms/open-banking/protocol/openid-connect/token';
 const CLIENT_ID = 'bd-online';
 const REDIRECT_URI = `${window.location.origin}/auth/callback`;
@@ -27,7 +27,7 @@ export interface User {
 
 // PKCE helpers
 function generateRandomString(length: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const array = new Uint8Array(length);
   crypto.getRandomValues(array);
   return Array.from(array, b => chars[b % chars.length]).join('');
