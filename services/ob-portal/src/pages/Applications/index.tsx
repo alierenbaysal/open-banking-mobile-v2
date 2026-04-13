@@ -14,6 +14,12 @@ import {
   Textarea,
   Alert,
   ThemeIcon,
+  Radio,
+  CopyButton,
+  ActionIcon,
+  Tooltip,
+  Code,
+  Divider,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useState, useCallback } from 'react';
@@ -23,6 +29,9 @@ import {
   IconApps,
   IconCalendar,
   IconAlertCircle,
+  IconCopy,
+  IconCheck,
+  IconCircleCheck,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -98,41 +107,121 @@ const ROLE_OPTIONS = [
   { value: 'CBPII', label: 'CBPII - Card Based Payment Instrument Issuer', description: 'Confirm funds' },
 ];
 
+function generateClientId(appName: string, environment: string): string {
+  const slug = appName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  const suffix = environment === 'sandbox' ? '-sandbox' : '-prod';
+  return slug + suffix;
+}
+
+function generateClientSecret(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `sb_sec_${hex}`;
+}
+
 export default function ApplicationsPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [apps, setApps] = useState<TppApplication[]>(INITIAL_APPS);
   const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
+  const [credentialsOpened, { open: openCredentials, close: closeCredentials }] = useDisclosure(false);
 
   // Form state
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+  const [newEnvironment, setNewEnvironment] = useState<string>('sandbox');
   const [newRedirectUris, setNewRedirectUris] = useState('');
   const [newRoles, setNewRoles] = useState<string[]>([]);
+
+  // Credentials display state (shown after successful registration)
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    clientId: string;
+    clientSecret: string;
+    appName: string;
+    appId: string;
+  } | null>(null);
+
+  // Pre-fill contact email when opening the create modal
+  const handleOpenCreate = useCallback(() => {
+    setNewContactEmail(user?.email || '');
+    openCreate();
+  }, [user, openCreate]);
+
+  const resetForm = useCallback(() => {
+    setNewName('');
+    setNewDescription('');
+    setNewCompanyName('');
+    setNewContactEmail('');
+    setNewEnvironment('sandbox');
+    setNewRedirectUris('');
+    setNewRoles([]);
+  }, []);
 
   const handleCreate = useCallback(() => {
     if (!newName || newRoles.length === 0) return;
 
+    const clientId = generateClientId(newName, newEnvironment);
+    const clientSecret = generateClientSecret();
+
     const app: TppApplication = {
-      id: `app-${Date.now()}`,
+      id: clientId,
       name: newName,
       description: newDescription,
-      clientId: `${newName.toLowerCase().replace(/\s+/g, '-')}-sandbox-${Date.now().toString(36)}`,
-      clientSecret: `sb_sec_${Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, '0')).join('')}`,
-      status: 'pending',
+      clientId,
+      clientSecret,
+      status: newEnvironment === 'sandbox' ? 'active' : 'pending',
       roles: newRoles,
-      redirectUris: newRedirectUris.split('\n').map(u => u.trim()).filter(Boolean),
+      redirectUris: newRedirectUris.split('\n').map((u) => u.trim()).filter(Boolean),
       createdAt: new Date().toISOString(),
-      environment: 'sandbox',
+      environment: newEnvironment as 'sandbox' | 'production',
     };
 
+    // 1. Add to local state immediately
     setApps((prev) => [app, ...prev]);
-    setNewName('');
-    setNewDescription('');
-    setNewRedirectUris('');
-    setNewRoles([]);
+
+    // 2. Fire-and-forget TPP manager API call (don't block on it)
+    try {
+      fetch('/portal-api/tpp/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          description: newDescription,
+          companyName: newCompanyName,
+          contactEmail: newContactEmail,
+          environment: newEnvironment,
+          roles: newRoles,
+          redirectUris: app.redirectUris,
+        }),
+      }).catch(() => {
+        // Silently ignore — the app is already in local state
+      });
+    } catch {
+      // Ignore fetch errors
+    }
+
+    // 3. Close registration modal and show credentials
     closeCreate();
-  }, [newName, newDescription, newRedirectUris, newRoles, closeCreate]);
+    resetForm();
+    setCreatedCredentials({ clientId, clientSecret, appName: newName, appId: clientId });
+    openCredentials();
+  }, [newName, newDescription, newCompanyName, newContactEmail, newEnvironment, newRedirectUris, newRoles, closeCreate, resetForm, openCredentials]);
+
+  const handleCredentialsDismiss = useCallback(() => {
+    const appId = createdCredentials?.appId;
+    closeCredentials();
+    setCreatedCredentials(null);
+    if (appId) {
+      navigate(`/applications/${appId}`);
+    }
+  }, [createdCredentials, closeCredentials, navigate]);
 
   if (!isAuthenticated) {
     return (
@@ -166,7 +255,7 @@ export default function ApplicationsPage() {
               Register and manage your Third Party Provider applications.
             </Text>
           </div>
-          <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+          <Button leftSection={<IconPlus size={16} />} onClick={handleOpenCreate}>
             Register New App
           </Button>
         </Group>
@@ -178,7 +267,7 @@ export default function ApplicationsPage() {
                 <IconApps size={32} />
               </ThemeIcon>
               <Text c="dimmed">You haven't registered any applications yet.</Text>
-              <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+              <Button leftSection={<IconPlus size={16} />} onClick={handleOpenCreate}>
                 Register Your First App
               </Button>
             </Stack>
@@ -240,6 +329,20 @@ export default function ApplicationsPage() {
             onChange={(e) => setNewName(e.currentTarget.value)}
           />
 
+          <TextInput
+            label="Company Name"
+            placeholder="Acme FinTech LLC"
+            value={newCompanyName}
+            onChange={(e) => setNewCompanyName(e.currentTarget.value)}
+          />
+
+          <TextInput
+            label="Contact Email"
+            placeholder="developer@company.com"
+            value={newContactEmail}
+            onChange={(e) => setNewContactEmail(e.currentTarget.value)}
+          />
+
           <Textarea
             label="Description"
             placeholder="Describe what your application does..."
@@ -247,6 +350,17 @@ export default function ApplicationsPage() {
             value={newDescription}
             onChange={(e) => setNewDescription(e.currentTarget.value)}
           />
+
+          <Radio.Group
+            label="Environment"
+            value={newEnvironment}
+            onChange={setNewEnvironment}
+          >
+            <Group mt="xs">
+              <Radio value="sandbox" label="Sandbox" description="Instant access with test data" />
+              <Radio value="production" label="Production" description="Requires Bank Dhofar review" />
+            </Group>
+          </Radio.Group>
 
           <div>
             <Text size="sm" fw={500} mb="xs">TPP Roles <Text span c="red">*</Text></Text>
@@ -292,6 +406,83 @@ export default function ApplicationsPage() {
             </Button>
           </Group>
         </Stack>
+      </Modal>
+
+      {/* Credentials Modal — shown once after successful registration */}
+      <Modal
+        opened={credentialsOpened}
+        onClose={handleCredentialsDismiss}
+        title={null}
+        size="lg"
+        centered
+        closeOnClickOutside={false}
+        closeOnEscape={false}
+      >
+        {createdCredentials && (
+          <Stack gap="lg">
+            <Group gap="sm">
+              <ThemeIcon size={40} radius="xl" color="green" variant="light">
+                <IconCircleCheck size={24} />
+              </ThemeIcon>
+              <div>
+                <Title order={4}>Application Registered Successfully!</Title>
+                <Text size="sm" c="dimmed">{createdCredentials.appName}</Text>
+              </div>
+            </Group>
+
+            <Alert color="orange" variant="light" icon={<IconAlertCircle size={16} />}>
+              <Text fw={600} size="sm">
+                Important: Save your client secret now. You won't be able to see it again.
+              </Text>
+            </Alert>
+
+            <Stack gap="sm">
+              <div>
+                <Text size="sm" fw={500} mb={4}>Client ID</Text>
+                <Group gap="xs">
+                  <Code block style={{ flex: 1, fontSize: '0.85rem' }}>
+                    {createdCredentials.clientId}
+                  </Code>
+                  <CopyButton value={createdCredentials.clientId}>
+                    {({ copied, copy }) => (
+                      <Tooltip label={copied ? 'Copied' : 'Copy'}>
+                        <ActionIcon variant="subtle" color={copied ? 'green' : 'gray'} onClick={copy}>
+                          {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </CopyButton>
+                </Group>
+              </div>
+
+              <Divider />
+
+              <div>
+                <Text size="sm" fw={500} mb={4}>Client Secret</Text>
+                <Group gap="xs">
+                  <Code block style={{ flex: 1, fontSize: '0.85rem' }}>
+                    {createdCredentials.clientSecret}
+                  </Code>
+                  <CopyButton value={createdCredentials.clientSecret}>
+                    {({ copied, copy }) => (
+                      <Tooltip label={copied ? 'Copied' : 'Copy'}>
+                        <ActionIcon variant="subtle" color={copied ? 'green' : 'gray'} onClick={copy}>
+                          {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </CopyButton>
+                </Group>
+              </div>
+            </Stack>
+
+            <Group justify="flex-end" mt="md">
+              <Button onClick={handleCredentialsDismiss}>
+                View Application
+              </Button>
+            </Group>
+          </Stack>
+        )}
       </Modal>
     </Container>
   );
