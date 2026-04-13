@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 COPY . .
-RUN npm run build
+ARG CACHE_BUST=1
+RUN echo "build: $CACHE_BUST" && npm run build
 
 FROM harbor.cp.bankdhofar.com/dockerhub/python:3.12-slim
 RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
