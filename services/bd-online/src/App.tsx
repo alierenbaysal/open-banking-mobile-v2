@@ -17,7 +17,7 @@ import { MantineProvider, createTheme, MantineColorsTuple } from '@mantine/core'
 import { Notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { handleCallback, handleSilentRenew } from '@/utils/auth';
+import { handleCallback } from '@/utils/auth';
 
 import Layout from '@/components/Layout';
 import Login from '@/pages/Login';
@@ -124,16 +124,8 @@ function AuthCallback() {
   return null;
 }
 
-/**
- * Silent renew handler — called in hidden iframe for token refresh.
- */
+/** Silent renew stub — not needed with manual PKCE flow. */
 function SilentRenew() {
-  useEffect(() => {
-    handleSilentRenew().catch(() => {
-      // Silent renew failed — user will be prompted on next API call
-    });
-  }, []);
-
   return null;
 }
 
