@@ -162,17 +162,15 @@ export async function getConsentHistory(consentId: string): Promise<ConsentHisto
 
 /**
  * List consents for a customer.
- * NOTE: This endpoint may not exist yet on the consent service.
- * The UI handles errors gracefully by showing an empty list.
  */
 export async function listConsents(customerId: string, status?: string): Promise<Consent[]> {
   const params = new URLSearchParams({ customer_id: customerId });
   if (status) params.set('status', status);
   try {
     return await apiFetch<Consent[]>(`${CONSENT_API_BASE}?${params.toString()}`);
-  } catch {
-    // Endpoint may not be implemented yet — return empty
-    return [];
+  } catch (err) {
+    console.error('listConsents failed:', err);
+    throw err;
   }
 }
 

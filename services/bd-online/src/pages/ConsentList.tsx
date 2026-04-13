@@ -36,6 +36,7 @@ export default function ConsentList() {
   const [consents, setConsents] = useState<Consent[]>([]);
   const [tppCache, setTppCache] = useState<Record<string, TPP>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabValue>('all');
 
   useEffect(() => {
@@ -67,8 +68,9 @@ export default function ConsentList() {
           }),
         );
         setTppCache(tppMap);
-      } catch {
-        // API not available
+      } catch (err) {
+        console.error('Failed to load consents:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load consents');
       }
 
       setLoading(false);
@@ -100,6 +102,19 @@ export default function ConsentList() {
       <Center h={400}>
         <Loader color="green" size="lg" />
       </Center>
+    );
+  }
+
+  if (error) {
+    return (
+      <Stack gap="lg">
+        <Box>
+          <Title order={3}>Open Banking Consents</Title>
+        </Box>
+        <Alert icon={<IconInfoCircle size={16} />} color="red" variant="light" radius="md">
+          <Text size="sm">{error}</Text>
+        </Alert>
+      </Stack>
     );
   }
 

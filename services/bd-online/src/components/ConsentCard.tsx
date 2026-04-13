@@ -97,11 +97,13 @@ export default function ConsentCard({ consent, tppName, onClick }: ConsentCardPr
   };
   const StatusIcon = statusConfig.icon;
 
-  const createdDate = new Date(consent.creation_time).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  const createdDate = consent.creation_time
+    ? new Date(consent.creation_time).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })
+    : null;
 
   const expiryDate = consent.expiration_time
     ? new Date(consent.expiration_time).toLocaleDateString('en-GB', {
@@ -165,14 +167,16 @@ export default function ConsentCard({ consent, tppName, onClick }: ConsentCardPr
           Permissions / الصلاحيات
         </Text>
         <Text size="xs" lineClamp={1}>
-          {getPermissionSummary(consent.permissions)}
+          {getPermissionSummary(consent.permissions || [])}
         </Text>
       </Box>
 
       <Group justify="space-between" mt="sm">
-        <Text size="xs" c="dimmed">
-          Created: {createdDate}
-        </Text>
+        {createdDate && (
+          <Text size="xs" c="dimmed">
+            Created: {createdDate}
+          </Text>
+        )}
         {expiryDate && (
           <Text size="xs" c="dimmed">
             Expires: {expiryDate}
@@ -180,11 +184,11 @@ export default function ConsentCard({ consent, tppName, onClick }: ConsentCardPr
         )}
       </Group>
 
-      {consent.selected_accounts && consent.selected_accounts.length > 0 && (
+      {consent.selected_accounts?.length ? (
         <Text size="xs" c="dimmed" mt={4}>
           {consent.selected_accounts.length} account{consent.selected_accounts.length > 1 ? 's' : ''} shared
         </Text>
-      )}
+      ) : null}
     </Card>
   );
 }

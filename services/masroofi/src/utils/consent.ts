@@ -8,6 +8,8 @@
  * 4. Exchange code for access token (or use consent_id directly for demo)
  */
 
+import { updateCurrentUserRecord, getCurrentUserRecord } from './auth';
+
 const CONSENT_SERVICE_URL = '/api/consent';
 const BD_ONLINE_BASE = 'https://banking.tnd.bankdhofar.com';
 const KEYCLOAK_TOKEN_URL = 'https://keycloak.uat.bankdhofar.com/realms/open-banking/protocol/openid-connect/token';
@@ -122,10 +124,12 @@ export function validateState(receivedState: string): boolean {
 
 /**
  * Store the access token and consent ID after successful auth.
+ * Also persists into the user record so it survives page refresh / re-login.
  */
 export function storeCredentials(token: string, consentId: string): void {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(CONSENT_KEY, consentId);
+  updateCurrentUserRecord({ bank_token: token, consent_id: consentId });
 }
 
 /**
@@ -144,15 +148,28 @@ export function getStoredConsentId(): string | null {
 
 /**
  * Check if a bank connection is active.
+ * Checks localStorage first, then falls back to the user record.
  */
 export function isBankConnected(): boolean {
-  return getStoredToken() !== null && getStoredConsentId() !== null;
+  if (getStoredToken() !== null && getStoredConsentId() !== null) {
+    return true;
+  }
+  // Fallback: check user record (survives cache clears within same login)
+  const record = getCurrentUserRecord();
+  if (record?.bank_token && record?.consent_id) {
+    // Restore to localStorage for this session
+    localStorage.setItem(TOKEN_KEY, record.bank_token);
+    localStorage.setItem(CONSENT_KEY, record.consent_id);
+    return true;
+  }
+  return false;
 }
 
 /**
- * Disconnect bank (clear stored credentials).
+ * Disconnect bank (clear stored credentials from localStorage and user record).
  */
 export function disconnectBank(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(CONSENT_KEY);
+  updateCurrentUserRecord({ bank_token: undefined, consent_id: undefined });
 }

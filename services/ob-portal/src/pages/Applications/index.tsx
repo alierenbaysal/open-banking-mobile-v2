@@ -43,6 +43,18 @@ export interface TppApplication {
 // In-memory store for demo purposes
 const INITIAL_APPS: TppApplication[] = [
   {
+    id: 'masroofi-demo',
+    name: 'Masroofi \u2014 Personal Finance Manager',
+    description: 'Bank Dhofar\'s personal finance management app. Aggregates accounts, tracks spending, and provides budgeting insights using Open Banking APIs.',
+    clientId: 'masroofi-demo',
+    clientSecret: 'sb_sec_masroofi_demo_internal',
+    status: 'active',
+    roles: ['AISP'],
+    redirectUris: ['https://masroofi.tnd.bankdhofar.com/callback'],
+    createdAt: '2026-04-12T00:00:00Z',
+    environment: 'production',
+  },
+  {
     id: 'app-001',
     name: 'FinTech PFM App',
     description: 'Personal finance management application for account aggregation and budgeting.',
