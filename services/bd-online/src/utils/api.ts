@@ -9,7 +9,7 @@ import { getAccessToken } from './auth';
 
 // In production, nginx proxies /consents/ to the consent service.
 // The base is relative so it goes through the same origin.
-const CONSENT_API_BASE = '/consents';
+const CONSENT_API_BASE = '/api/consents';
 const TPP_API_BASE = '/tpp';
 
 // ----- Types matching the consent-service Pydantic models -----
