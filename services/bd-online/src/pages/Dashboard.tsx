@@ -24,11 +24,12 @@ import {
   IconArrowRight,
   IconBuildingBank,
   IconClock,
+  IconArrowsExchange,
 } from '@tabler/icons-react';
 import AccountCard from '@/components/AccountCard';
 import { getUser, getDisplayName, getEmail, type User } from '@/utils/auth';
 import {
-  getCustomerAccounts,
+  getCustomerAccountsWithBalances,
   resolveCustomerId,
   formatBalance,
   type BankAccount,
@@ -52,8 +53,8 @@ export default function Dashboard() {
       setUser(u);
 
       const email = getEmail(u);
-      const customerId = resolveCustomerId(email || String(u.profile.sub || u.sub));
-      const accts = getCustomerAccounts(customerId);
+      const customerId = u.customer_id || resolveCustomerId(email || String(u.profile.sub || u.sub));
+      const accts = getCustomerAccountsWithBalances(customerId);
       setAccounts(accts);
 
       // Try to load consents (may fail if API not available)
@@ -195,6 +196,32 @@ export default function Dashboard() {
           ))}
         </SimpleGrid>
       </Box>
+
+      {/* Quick transfer */}
+      <Card withBorder radius="md" padding="md">
+        <Group justify="space-between">
+          <Group gap="sm">
+            <ThemeIcon size="lg" color="green" variant="light" radius="md">
+              <IconArrowsExchange size={20} />
+            </ThemeIcon>
+            <Box>
+              <Text fw={600}>Quick Transfer / تحويل سريع</Text>
+              <Text size="sm" c="dimmed">
+                Transfer between your accounts or to another beneficiary
+              </Text>
+            </Box>
+          </Group>
+          <Button
+            variant="filled"
+            color="green"
+            rightSection={<IconArrowRight size={16} />}
+            onClick={() => navigate('/transfer')}
+            style={{ backgroundColor: '#4D9134' }}
+          >
+            Transfer Now
+          </Button>
+        </Group>
+      </Card>
 
       {/* Quick actions */}
       <Card withBorder radius="md" padding="md">

@@ -47,7 +47,7 @@ export default function ConsentList() {
       }
 
       const email = getEmail(user);
-      const customerId = resolveCustomerId(email || String(user.profile.sub || user.sub));
+      const customerId = user.customer_id || resolveCustomerId(email || String(user.profile.sub || user.sub));
 
       try {
         const data = await listConsents(customerId);

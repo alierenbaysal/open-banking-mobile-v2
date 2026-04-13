@@ -5,6 +5,7 @@ import App from './App';
 
 // Handle OIDC callback BEFORE React mounts — window.location.search is guaranteed intact
 if (window.location.pathname === '/auth/callback') {
+  document.title = 'Processing login...';
   const params = new URLSearchParams(window.location.search);
   if (params.has('code')) {
     handleCallback()

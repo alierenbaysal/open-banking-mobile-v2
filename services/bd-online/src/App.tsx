@@ -25,6 +25,7 @@ import Dashboard from '@/pages/Dashboard';
 import ConsentApproval from '@/pages/ConsentApproval';
 import ConsentList from '@/pages/ConsentList';
 import ConsentDetail from '@/pages/ConsentDetail';
+import Transfer from '@/pages/Transfer';
 
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
@@ -150,6 +151,7 @@ export default function App() {
               <Route path="/consent/approve" element={<ConsentApproval />} />
               <Route path="/consents" element={<ConsentList />} />
               <Route path="/consents/:consentId" element={<ConsentDetail />} />
+              <Route path="/transfer" element={<Transfer />} />
             </Route>
 
             {/* Fallback */}

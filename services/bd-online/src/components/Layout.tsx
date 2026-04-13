@@ -23,6 +23,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
   IconHome,
   IconShieldCheck,
+  IconArrowsExchange,
   IconLogout,
   IconUser,
   IconBuildingBank,
@@ -48,6 +49,12 @@ const NAV_ITEMS: NavItem[] = [
     labelAr: 'الموافقات',
     icon: IconShieldCheck,
     path: '/consents',
+  },
+  {
+    label: 'Transfer',
+    labelAr: 'تحويل',
+    icon: IconArrowsExchange,
+    path: '/transfer',
   },
 ];
 
