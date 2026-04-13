@@ -35,12 +35,11 @@ import {
 } from '@tabler/icons-react';
 import { getUser, getDisplayName, type User } from '@/utils/auth';
 import {
-  getCustomerAccountsWithBalances,
+  fetchCustomerAccounts,
+  executeTransfer as executeBankingTransfer,
   resolveCustomerId,
   formatBalance,
   maskIban,
-  setAccountBalance,
-  getAccountBalance,
   saveTransfer,
   type BankAccount,
   type TransferRecord,
@@ -80,16 +79,18 @@ export default function Transfer() {
       const custId =
         u.customer_id || resolveCustomerId(u.email || String(u.profile.sub || u.sub));
       setCustomerId(custId);
-      setAccounts(getCustomerAccountsWithBalances(custId));
+      const accts = await fetchCustomerAccounts(custId);
+      setAccounts(accts);
       setLoading(false);
     }
     load();
   }, [navigate]);
 
-  // Refresh accounts from session storage (balances may have changed)
-  const refreshAccounts = useCallback(() => {
+  // Refresh accounts from Banking API (balances may have changed after transfer)
+  const refreshAccounts = useCallback(async () => {
     if (customerId) {
-      setAccounts(getCustomerAccountsWithBalances(customerId));
+      const accts = await fetchCustomerAccounts(customerId);
+      setAccounts(accts);
     }
   }, [customerId]);
 
@@ -122,45 +123,66 @@ export default function Transfer() {
 
     setSubmitting(true);
 
-    // Simulate a short processing delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    try {
+      if (transferMode === 'own' && toAccountId) {
+        // Execute transfer via Banking API
+        const result = await executeBankingTransfer({
+          customer_id: customerId,
+          source_account_id: fromAccount.accountId,
+          target_account_id: toAccountId,
+          amount: parsedAmount,
+          currency: 'OMR',
+          reference: reference.trim(),
+          description: `Transfer from ${fromAccount.description}`,
+        });
 
-    // Generate a reference number
-    const refNum = `TRF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+        // Save the transfer record locally for display
+        const record: TransferRecord = {
+          id: result.transfer_id,
+          fromAccountId: fromAccount.accountId,
+          toAccountId: toAccountId,
+          toIban: toAccount?.iban || null,
+          amount: parsedAmount,
+          currency: 'OMR',
+          reference: reference.trim(),
+          timestamp: result.created_at,
+        };
+        saveTransfer(record);
+        setSuccess(record);
+      } else {
+        // External IBAN transfer — save locally only (no backend target account)
+        const refNum = `TRF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+        const record: TransferRecord = {
+          id: refNum,
+          fromAccountId: fromAccount.accountId,
+          toAccountId: null,
+          toIban: toIban,
+          amount: parsedAmount,
+          currency: 'OMR',
+          reference: reference.trim(),
+          timestamp: new Date().toISOString(),
+        };
+        saveTransfer(record);
+        setSuccess(record);
+      }
 
-    // Debit from account
-    const newFromBalance = fromAccount.balance - parsedAmount;
-    setAccountBalance(fromAccount.accountId, newFromBalance);
+      await refreshAccounts();
 
-    // Credit to account (if own transfer)
-    if (transferMode === 'own' && toAccount) {
-      const newToBalance = toAccount.balance + parsedAmount;
-      setAccountBalance(toAccount.accountId, newToBalance);
+      notifications.show({
+        title: 'Transfer Successful',
+        message: `${formatBalance(parsedAmount)} transferred successfully.`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    } catch (err) {
+      notifications.show({
+        title: 'Transfer Failed',
+        message: err instanceof Error ? err.message : 'An error occurred during the transfer.',
+        color: 'red',
+      });
     }
 
-    // Save the transfer record
-    const record: TransferRecord = {
-      id: refNum,
-      fromAccountId: fromAccount.accountId,
-      toAccountId: transferMode === 'own' ? toAccountId : null,
-      toIban: transferMode === 'external' ? toIban : toAccount?.iban || null,
-      amount: parsedAmount,
-      currency: 'OMR',
-      reference: reference.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    saveTransfer(record);
-
-    setSuccess(record);
     setSubmitting(false);
-    refreshAccounts();
-
-    notifications.show({
-      title: 'Transfer Successful',
-      message: `${formatBalance(parsedAmount)} transferred successfully.`,
-      color: 'green',
-      icon: <IconCheck size={16} />,
-    });
   };
 
   const handleNewTransfer = () => {
@@ -171,7 +193,7 @@ export default function Transfer() {
     setAmount('');
     setReference('');
     setTransferMode('own');
-    refreshAccounts();
+    void refreshAccounts();
   };
 
   if (loading) {

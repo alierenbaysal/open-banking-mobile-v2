@@ -10,7 +10,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import consents, health, tpp, validation
+from app.api import banking, consents, health, tpp, validation
 from app.config import settings
 from app.core.database import close_pool, init_pool
 from app.workers.expiration import expiration_loop
@@ -67,3 +67,4 @@ app.include_router(health.router)
 app.include_router(consents.router)
 app.include_router(validation.router)
 app.include_router(tpp.router)
+app.include_router(banking.router)

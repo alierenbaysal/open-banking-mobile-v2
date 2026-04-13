@@ -29,7 +29,7 @@ import {
 import AccountCard from '@/components/AccountCard';
 import { getUser, getDisplayName, getEmail, type User } from '@/utils/auth';
 import {
-  getCustomerAccountsWithBalances,
+  fetchCustomerAccounts,
   resolveCustomerId,
   formatBalance,
   type BankAccount,
@@ -54,7 +54,7 @@ export default function Dashboard() {
 
       const email = getEmail(u);
       const customerId = u.customer_id || resolveCustomerId(email || String(u.profile.sub || u.sub));
-      const accts = getCustomerAccountsWithBalances(customerId);
+      const accts = await fetchCustomerAccounts(customerId);
       setAccounts(accts);
 
       // Try to load consents (may fail if API not available)

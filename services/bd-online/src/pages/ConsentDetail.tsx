@@ -48,7 +48,7 @@ import {
   type TPP,
   type ConsentHistoryEntry,
 } from '@/utils/api';
-import { getAccountById } from '@/utils/accounts';
+import { fetchCustomerAccounts, type BankAccount } from '@/utils/accounts';
 
 export default function ConsentDetail() {
   const { consentId } = useParams<{ consentId: string }>();
@@ -61,6 +61,7 @@ export default function ConsentDetail() {
   const [revoking, setRevoking] = useState(false);
   const [revokeReason, setRevokeReason] = useState('');
   const [revokeOpened, { open: openRevoke, close: closeRevoke }] = useDisclosure(false);
+  const [sharedAccountsMap, setSharedAccountsMap] = useState<Record<string, BankAccount>>({});
 
   useEffect(() => {
     async function load() {
@@ -83,6 +84,20 @@ export default function ConsentDetail() {
           setTpp(tppData);
         } catch {
           // Optional
+        }
+
+        // Load shared account details from Banking API
+        if (consentData.customer_id && consentData.selected_accounts?.length) {
+          try {
+            const accts = await fetchCustomerAccounts(consentData.customer_id);
+            const map: Record<string, BankAccount> = {};
+            for (const a of accts) {
+              map[a.accountId] = a;
+            }
+            setSharedAccountsMap(map);
+          } catch {
+            // Optional — fallback to showing just account IDs
+          }
         }
       } catch {
         notifications.show({
@@ -333,7 +348,7 @@ export default function ConsentDetail() {
           </Text>
           <Stack gap="sm">
             {consent.selected_accounts.map((accountId) => {
-              const account = getAccountById(accountId);
+              const account = sharedAccountsMap[accountId];
               if (account) {
                 return (
                   <AccountCard key={accountId} account={account} compact />

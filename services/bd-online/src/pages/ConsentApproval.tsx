@@ -53,7 +53,7 @@ import {
   type TPP,
 } from '@/utils/api';
 import {
-  getCustomerAccounts,
+  fetchCustomerAccounts,
   resolveCustomerId,
   formatBalance,
   type BankAccount,
@@ -97,7 +97,8 @@ export default function ConsentApproval() {
       const email = getEmail(u);
       const custId = u.customer_id || resolveCustomerId(email || String(u.profile.sub || u.sub));
       setCustomerId(custId);
-      setAccounts(getCustomerAccounts(custId));
+      const accts = await fetchCustomerAccounts(custId);
+      setAccounts(accts);
 
       if (!consentId) {
         setError('No consent ID provided. Please start the authorization flow from your service provider.');

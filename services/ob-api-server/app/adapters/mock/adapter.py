@@ -1,11 +1,14 @@
 """Mock adapter — returns synthetic OBIE-compliant data for all 64 endpoints.
 
-All state is held in-memory (dict).  Restarting the service resets everything.
+Accounts, balances, and transactions are served from the Banking API (PostgreSQL)
+via the consent service.  All other resources (beneficiaries, statements, etc.)
+still use in-memory fixtures.
 """
 
 from __future__ import annotations
 
 import copy
+import logging
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -18,6 +21,9 @@ from app.core.errors import not_found, bad_request
 from app.config import settings
 
 _TZ_OMAN = timezone(timedelta(hours=4))
+logger = logging.getLogger(__name__)
+
+_BANKING_BASE = f"{settings.consent_service_url}/banking"
 
 
 def _now() -> str:
@@ -28,14 +34,76 @@ def _uuid() -> str:
     return str(uuid.uuid4())
 
 
+def _to_obie_account(row: dict) -> dict:
+    """Transform a Banking API account row to OBIE format."""
+    acct_type = row.get("account_type", "")
+    if "Current" in acct_type or "Savings" in acct_type:
+        obie_type = "Personal"
+    else:
+        obie_type = "Business"
+    first = row.get("first_name", "")
+    last = row.get("last_name", "")
+    return {
+        "AccountId": row["account_id"],
+        "Currency": row.get("currency", "OMR"),
+        "AccountType": obie_type,
+        "AccountSubType": acct_type,
+        "Description": row.get("description", ""),
+        "Status": row.get("status", "Enabled"),
+        "Account": [
+            {
+                "SchemeName": "IBAN",
+                "Identification": row.get("iban", ""),
+                "Name": f"{first} {last}".strip(),
+            }
+        ],
+    }
+
+
+def _to_obie_balance(row: dict, account_id: str) -> dict:
+    """Transform a Banking API balance row to OBIE format."""
+    balance = float(row.get("balance", 0))
+    return {
+        "AccountId": account_id,
+        "Amount": {"Amount": f"{balance:.3f}", "Currency": row.get("currency", "OMR")},
+        "CreditDebitIndicator": "Credit" if balance >= 0 else "Debit",
+        "Type": "InterimAvailable",
+        "DateTime": _now(),
+        "CreditLine": [],
+    }
+
+
+def _to_obie_transaction(row: dict) -> dict:
+    """Transform a Banking API transaction row to OBIE format."""
+    amount = float(row.get("amount", 0))
+    balance_after = float(row.get("balance_after", 0))
+    created_at = row.get("created_at", "")
+    if isinstance(created_at, str):
+        dt_str = created_at
+    else:
+        dt_str = created_at.isoformat() if created_at else _now()
+    return {
+        "AccountId": row.get("account_id", ""),
+        "TransactionId": row.get("transaction_id", ""),
+        "TransactionReference": row.get("reference", ""),
+        "Amount": {"Amount": f"{abs(amount):.3f}", "Currency": row.get("currency", "OMR")},
+        "CreditDebitIndicator": row.get("direction", "Debit"),
+        "Status": row.get("status", "Booked"),
+        "BookingDateTime": dt_str,
+        "TransactionInformation": row.get("description", ""),
+        "Balance": {
+            "Amount": {"Amount": f"{abs(balance_after):.3f}", "Currency": row.get("currency", "OMR")},
+            "CreditDebitIndicator": "Credit" if balance_after >= 0 else "Debit",
+            "Type": "InterimBooked",
+        },
+    }
+
+
 class MockAdapter(OBIEAdapter):
-    """In-memory mock implementing every OBIEAdapter method."""
+    """Hybrid adapter: accounts/balances/transactions from Banking API, rest from fixtures."""
 
     def __init__(self) -> None:
-        # Deep-copy fixtures so mutations don't pollute the module-level data
-        self._accounts: list[dict] = copy.deepcopy(fixtures.ACCOUNTS)
-        self._balances: dict[str, list[dict]] = copy.deepcopy(fixtures.BALANCES)
-        self._transactions: dict[str, list[dict]] = copy.deepcopy(fixtures.TRANSACTIONS)
+        # Fixtures still used for supplementary AIS resources
         self._beneficiaries: dict[str, list[dict]] = copy.deepcopy(fixtures.BENEFICIARIES)
         self._direct_debits: dict[str, list[dict]] = copy.deepcopy(fixtures.DIRECT_DEBITS)
         self._standing_orders: dict[str, list[dict]] = copy.deepcopy(fixtures.STANDING_ORDERS)
@@ -62,11 +130,22 @@ class MockAdapter(OBIEAdapter):
 
     # ── helpers ──────────────────────────────────────────────────────────
 
-    def _find_account(self, account_id: str) -> dict:
-        for acct in self._accounts:
-            if acct["AccountId"] == account_id:
-                return acct
-        raise not_found("Account", account_id)
+    async def _banking_get(self, path: str, params: dict | None = None) -> Any:
+        """Call the Banking API (consent-service) and return parsed JSON."""
+        url = f"{_BANKING_BASE}{path}"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            return resp.json()
+
+    async def _validate_account(self, account_id: str) -> None:
+        """Verify account exists via Banking API. Raises not_found on 404."""
+        try:
+            await self._banking_get(f"/accounts/{account_id}/balances")
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise not_found("Account", account_id)
+            raise
 
     # ── AIS: Account Access Consents ────────────────────────────────────
 
@@ -122,17 +201,22 @@ class MockAdapter(OBIEAdapter):
             pass
         return None
 
-    def _filter_accounts(self, account_ids: list[str] | None) -> list[dict]:
-        """Filter accounts by IDs. If None, return all."""
-        if account_ids is None:
-            return self._accounts
-        return [a for a in self._accounts if a["AccountId"] in account_ids]
-
-    # ── AIS: Accounts ───────────────────────────────────────────────────
+    # ── AIS: Accounts (from Banking API) ────────────────────────────────
 
     async def get_accounts(self, consent_id: str) -> dict[str, Any]:
         allowed = await self._get_consented_account_ids(consent_id)
-        accounts = self._filter_accounts(allowed)
+        if allowed:
+            # Fetch only the consented accounts from the Banking API
+            try:
+                ids_str = ",".join(allowed)
+                rows = await self._banking_get("/accounts/by-ids", params={"ids": ids_str})
+                accounts = [_to_obie_account(r) for r in rows]
+            except Exception:
+                logger.exception("Banking API call failed for get_accounts, returning empty")
+                accounts = []
+        else:
+            # No consent filter — return empty (no blanket access without consent)
+            accounts = []
         return {
             "Data": {"Account": accounts},
             "Links": {"Self": "/open-banking/v4.0/aisp/accounts"},
@@ -140,7 +224,13 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_account(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        acct = self._find_account(account_id)
+        try:
+            row = await self._banking_get(f"/accounts/{account_id}")
+            acct = _to_obie_account(row)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise not_found("Account", account_id)
+            raise
         return {
             "Data": {"Account": [acct]},
             "Links": {"Self": f"/open-banking/v4.0/aisp/accounts/{account_id}"},
@@ -148,10 +238,15 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_balances(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
-        bals = self._balances.get(account_id, [])
+        try:
+            row = await self._banking_get(f"/accounts/{account_id}/balances")
+            bal = _to_obie_balance(row, account_id)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise not_found("Account", account_id)
+            raise
         return {
-            "Data": {"Balance": bals},
+            "Data": {"Balance": [bal]},
             "Links": {"Self": f"/open-banking/v4.0/aisp/accounts/{account_id}/balances"},
             "Meta": {"TotalPages": 1},
         }
@@ -163,8 +258,13 @@ class MockAdapter(OBIEAdapter):
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> dict[str, Any]:
-        self._find_account(account_id)
-        txns = self._transactions.get(account_id, [])
+        try:
+            rows = await self._banking_get(f"/accounts/{account_id}/transactions")
+            txns = [_to_obie_transaction(r) for r in rows]
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise not_found("Account", account_id)
+            raise
         return {
             "Data": {"Transaction": txns},
             "Links": {"Self": f"/open-banking/v4.0/aisp/accounts/{account_id}/transactions"},
@@ -172,7 +272,7 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_beneficiaries(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
+        await self._validate_account(account_id)
         bens = self._beneficiaries.get(account_id, [])
         return {
             "Data": {"Beneficiary": bens},
@@ -181,7 +281,7 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_direct_debits(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
+        await self._validate_account(account_id)
         dds = self._direct_debits.get(account_id, [])
         return {
             "Data": {"DirectDebit": dds},
@@ -190,7 +290,7 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_standing_orders(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
+        await self._validate_account(account_id)
         sos = self._standing_orders.get(account_id, [])
         return {
             "Data": {"StandingOrder": sos},
@@ -199,7 +299,7 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_scheduled_payments(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
+        await self._validate_account(account_id)
         sps = self._scheduled_payments.get(account_id, [])
         return {
             "Data": {"ScheduledPayment": sps},
@@ -208,7 +308,7 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_statements(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
+        await self._validate_account(account_id)
         stmts = self._statements.get(account_id, [])
         return {
             "Data": {"Statement": stmts},
@@ -217,7 +317,7 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_statement(self, account_id: str, statement_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
+        await self._validate_account(account_id)
         stmts = self._statements.get(account_id, [])
         for s in stmts:
             if s["StatementId"] == statement_id:
@@ -236,9 +336,13 @@ class MockAdapter(OBIEAdapter):
         statement_id: str,
         consent_id: str,
     ) -> dict[str, Any]:
-        self._find_account(account_id)
-        # Return all transactions for the account as statement transactions
-        txns = self._transactions.get(account_id, [])
+        await self._validate_account(account_id)
+        # Return all transactions for the account as statement transactions (from Banking API)
+        try:
+            rows = await self._banking_get(f"/accounts/{account_id}/transactions")
+            txns = [_to_obie_transaction(r) for r in rows]
+        except Exception:
+            txns = []
         return {
             "Data": {"Transaction": txns},
             "Links": {
@@ -248,7 +352,7 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_product(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
+        await self._validate_account(account_id)
         prod = self._products.get(account_id, {
             "AccountId": account_id,
             "ProductId": "PROD-GENERIC",
@@ -262,7 +366,7 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_party(self, account_id: str, consent_id: str) -> dict[str, Any]:
-        self._find_account(account_id)
+        await self._validate_account(account_id)
         party = self._parties.get(account_id, {
             "PartyId": "PARTY-UNKNOWN",
             "PartyType": "Sole",
@@ -277,9 +381,16 @@ class MockAdapter(OBIEAdapter):
     # ── AIS: Bulk ───────────────────────────────────────────────────────
 
     async def get_all_balances(self, consent_id: str) -> dict[str, Any]:
-        all_bals = []
-        for bals in self._balances.values():
-            all_bals.extend(bals)
+        """Get balances for all consented accounts via Banking API."""
+        allowed = await self._get_consented_account_ids(consent_id)
+        all_bals: list[dict] = []
+        if allowed:
+            for account_id in allowed:
+                try:
+                    row = await self._banking_get(f"/accounts/{account_id}/balances")
+                    all_bals.append(_to_obie_balance(row, account_id))
+                except Exception:
+                    logger.warning("Failed to fetch balance for %s", account_id)
         return {
             "Data": {"Balance": all_bals},
             "Links": {"Self": "/open-banking/v4.0/aisp/balances"},
@@ -287,9 +398,16 @@ class MockAdapter(OBIEAdapter):
         }
 
     async def get_all_transactions(self, consent_id: str) -> dict[str, Any]:
-        all_txns = []
-        for txns in self._transactions.values():
-            all_txns.extend(txns)
+        """Get transactions for all consented accounts via Banking API."""
+        allowed = await self._get_consented_account_ids(consent_id)
+        all_txns: list[dict] = []
+        if allowed:
+            for account_id in allowed:
+                try:
+                    rows = await self._banking_get(f"/accounts/{account_id}/transactions")
+                    all_txns.extend([_to_obie_transaction(r) for r in rows])
+                except Exception:
+                    logger.warning("Failed to fetch transactions for %s", account_id)
         return {
             "Data": {"Transaction": all_txns},
             "Links": {"Self": "/open-banking/v4.0/aisp/transactions"},
