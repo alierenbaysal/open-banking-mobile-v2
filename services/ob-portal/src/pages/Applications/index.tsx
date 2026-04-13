@@ -34,6 +34,7 @@ import {
   IconCircleCheck,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth';
+import { getAllApps as getAllAppsFromStore, registerApp as registerAppToStore } from '../../utils/appStore';
 import { StatusBadge } from '../../components/common/StatusBadge';
 
 export interface TppApplication {
@@ -127,15 +128,7 @@ function generateClientSecret(): string {
 export default function ApplicationsPage() {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
-  const [apps, setApps] = useState<TppApplication[]>(() => {
-    // Load from shared store (built-in + localStorage-registered)
-    try {
-      const { getAllApps } = require('../../utils/appStore');
-      return getAllApps();
-    } catch {
-      return INITIAL_APPS;
-    }
-  });
+  const [apps, setApps] = useState<TppApplication[]>(() => getAllAppsFromStore());
   const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [credentialsOpened, { open: openCredentials, close: closeCredentials }] = useDisclosure(false);
 
@@ -193,10 +186,7 @@ export default function ApplicationsPage() {
 
     // 1. Add to local state + persist in localStorage
     setApps((prev) => [app, ...prev]);
-    try {
-      const { registerApp } = require('../../utils/appStore');
-      registerApp(app);
-    } catch { /* ignore */ }
+    registerAppToStore(app);
 
     // 2. Fire-and-forget TPP manager API call (don't block on it)
     try {

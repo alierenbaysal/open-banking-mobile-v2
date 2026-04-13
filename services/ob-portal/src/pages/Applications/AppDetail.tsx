@@ -40,6 +40,7 @@ import { useState } from 'react';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { useAuth } from '../../hooks/useAuth';
 import { type TppApplication } from './index';
+import { getAppById as getAppByIdFromStore } from '../../utils/appStore';
 
 // Demo data — same as in index.tsx for cross-navigation
 const DEMO_APPS: TppApplication[] = [
@@ -122,11 +123,7 @@ export default function AppDetail() {
   const [regenerateConfirm, { open: openRegenerate, close: closeRegenerate }] = useDisclosure(false);
 
   // Try shared store first (includes built-in + user-registered), fallback to DEMO_APPS
-  let app: TppApplication | undefined;
-  try {
-    const { getAppById } = require('../../utils/appStore');
-    app = getAppById(appId);
-  } catch { /* ignore */ }
+  let app: TppApplication | undefined = getAppByIdFromStore(appId || '');
   if (!app) {
     app = DEMO_APPS.find((a) => a.id === appId);
   }
