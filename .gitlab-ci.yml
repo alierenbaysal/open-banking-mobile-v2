@@ -142,3 +142,19 @@ build-salalah-electronics:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - services/salalah-electronics/**/*
+
+build-hisab:
+  <<: *build_template
+  script:
+    - >
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/services/hisab"
+      --dockerfile "${CI_PROJECT_DIR}/services/hisab/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/hisab:${CI_COMMIT_SHORT_SHA}"
+      --destination "${CI_REGISTRY_IMAGE}/hisab:latest"
+      --build-arg "CACHE_BUST=${CI_COMMIT_SHORT_SHA}"
+      --cache=false
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/hisab/**/*
