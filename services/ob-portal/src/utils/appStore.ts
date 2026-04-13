@@ -1,25 +1,13 @@
 /**
  * Shared app store — localStorage-backed so both Applications list and AppDetail can read.
+ * Uses 'any' to avoid circular dependency with the TppApplication type in index.tsx.
  */
-
-export interface TppApplication {
-  id: string;
-  name: string;
-  description: string;
-  clientId: string;
-  clientSecret: string;
-  status: 'active' | 'pending' | 'inactive';
-  roles: string[];
-  redirectUris: string[];
-  createdAt: string;
-  environment: string;
-  companyName?: string;
-  contactEmail?: string;
-}
 
 const STORAGE_KEY = 'qantara_registered_apps';
 
-const BUILT_IN_APPS: TppApplication[] = [
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+const BUILT_IN_APPS: any[] = [
   {
     id: 'masroofi-demo',
     name: 'Masroofi \u2014 Personal Finance Manager',
@@ -49,7 +37,7 @@ const BUILT_IN_APPS: TppApplication[] = [
   },
 ];
 
-function loadCustomApps(): TppApplication[] {
+function loadCustomApps(): any[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -58,22 +46,19 @@ function loadCustomApps(): TppApplication[] {
   }
 }
 
-function saveCustomApps(apps: TppApplication[]): void {
+function saveCustomApps(apps: any[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(apps));
 }
 
-/** Get all apps (built-in + user-registered). */
-export function getAllApps(): TppApplication[] {
+export function getAllApps(): any[] {
   return [...BUILT_IN_APPS, ...loadCustomApps()];
 }
 
-/** Get a single app by ID. */
-export function getAppById(id: string): TppApplication | undefined {
-  return getAllApps().find(a => a.id === id);
+export function getAppById(id: string): any | undefined {
+  return getAllApps().find((a: any) => a.id === id);
 }
 
-/** Register a new app. */
-export function registerApp(app: TppApplication): void {
+export function registerApp(app: any): void {
   const custom = loadCustomApps();
   custom.unshift(app);
   saveCustomApps(custom);
