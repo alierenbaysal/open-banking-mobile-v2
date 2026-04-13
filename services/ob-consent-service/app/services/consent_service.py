@@ -137,6 +137,35 @@ async def get_consent(consent_id: UUID) -> ConsentResponse | None:
     return _row_to_response(dict(row))
 
 
+async def list_consents(
+    customer_id: str | None = None,
+    tpp_id: str | None = None,
+    status_filter: str | None = None,
+) -> list[ConsentResponse]:
+    """List consents, optionally filtered by customer_id, tpp_id, or status."""
+    conditions = []
+    params = []
+    idx = 1
+    if customer_id:
+        conditions.append(f"customer_id = ${idx}")
+        params.append(customer_id)
+        idx += 1
+    if tpp_id:
+        conditions.append(f"tpp_id = ${idx}")
+        params.append(tpp_id)
+        idx += 1
+    if status_filter:
+        conditions.append(f"status = ${idx}")
+        params.append(status_filter)
+        idx += 1
+
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    sql = f"SELECT * FROM consents{where} ORDER BY creation_time DESC LIMIT 100"
+    async with acquire() as conn:
+        rows = await conn.fetch(sql, *params)
+    return [_row_to_response(dict(r)) for r in rows]
+
+
 async def authorize_consent(consent_id: UUID, req: AuthorizeConsentRequest) -> ConsentResponse:
     """Customer authorizes a consent.
 

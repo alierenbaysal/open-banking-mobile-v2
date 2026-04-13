@@ -34,6 +34,16 @@ async def create_consent(req: CreateConsentRequest) -> ConsentResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("", response_model=list[ConsentResponse])
+async def list_consents(
+    customer_id: str | None = Query(None),
+    tpp_id: str | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
+) -> list[ConsentResponse]:
+    """List consents, optionally filtered."""
+    return await consent_service.list_consents(customer_id, tpp_id, status_filter)
+
+
 @router.get("/{consent_id}", response_model=ConsentResponse)
 async def get_consent(consent_id: UUID) -> ConsentResponse:
     """Retrieve a consent by its ID."""
