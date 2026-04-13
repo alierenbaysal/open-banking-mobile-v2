@@ -469,7 +469,7 @@ func (h *Handler) registerWithConsentService(tpp *models.TPP) error {
 		return fmt.Errorf("failed to marshal consent service payload: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/api/tpp", h.consentServiceURL)
+	url := fmt.Sprintf("%s/tpp", h.consentServiceURL)
 	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("consent service request failed: %w", err)
