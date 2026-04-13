@@ -190,12 +190,15 @@ class MockAdapter(OBIEAdapter):
     # ── Consent-scoped account filtering ────────────────────────────────
 
     async def _get_consented_account_ids(self, consent_id: str) -> list[str] | None:
-        """Fetch selected_accounts from consent service. Returns None if consent not found or no filter."""
+        """Fetch selected_accounts from consent service. Returns empty list if revoked/expired."""
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{settings.consent_service_url}/consents/{consent_id}")
                 if resp.status_code == 200:
                     data = resp.json()
+                    status = data.get("status", "")
+                    if status != "Authorised":
+                        return []  # Consent revoked/expired — no access
                     return data.get("selected_accounts")
         except Exception:
             pass
