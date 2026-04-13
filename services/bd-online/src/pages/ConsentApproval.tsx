@@ -166,8 +166,8 @@ export default function ConsentApproval() {
   const handleApprove = async () => {
     if (!consent || !consentId) return;
 
-    // For AIS consents, require at least one account
-    if (consent.consent_type === 'account-access' && selectedAccounts.length === 0) {
+    // Require at least one account for all consent types
+    if (selectedAccounts.length === 0) {
       notifications.show({
         title: 'Select Accounts',
         message: 'Please select at least one account to share.',
@@ -443,17 +443,18 @@ export default function ConsentApproval() {
         </Paper>
       )}
 
-      {/* Account picker (for AIS and VRP consents) */}
+      {/* Account picker (for all consent types that need account selection) */}
       {(consent.consent_type === 'account-access' ||
+        consent.consent_type === 'domestic-payment' ||
         consent.consent_type === 'domestic-vrp') && (
         <Card withBorder radius="md" padding="md">
           <Stack gap="md">
             <Box>
               <Text fw={600}>
-                Select Accounts to Share
+                {isPayment ? 'Select Account to Pay From' : 'Select Accounts to Share'}
               </Text>
               <Text size="xs" c="dimmed">
-                {'اختر الحسابات للمشاركة'}
+                {isPayment ? 'اختر الحساب للدفع منه' : 'اختر الحسابات للمشاركة'}
               </Text>
             </Box>
             <AccountPicker
@@ -491,7 +492,7 @@ export default function ConsentApproval() {
               onClick={handleApprove}
               loading={submitting}
               disabled={
-                (consent.consent_type === 'account-access' && selectedAccounts.length === 0) ||
+                selectedAccounts.length === 0 ||
                 submitting
               }
               style={{ backgroundColor: '#4D9134' }}
