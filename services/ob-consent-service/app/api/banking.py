@@ -6,7 +6,10 @@ Reads from the ``qantara`` PostgreSQL database (customers, accounts, transaction
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import secrets
+import time
 import uuid
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
@@ -21,6 +24,126 @@ router = APIRouter(prefix="/banking", tags=["banking"])
 logger = logging.getLogger(__name__)
 
 _TZ_OMAN = timezone(timedelta(hours=4))
+
+# ── Password hashing ──────────────────────────────────────────────────
+
+_PASSWORD_SALT = "bankdhofar-salt-2026"
+
+
+def hash_password(password: str) -> str:
+    """Hash a password using SHA-256 with a fixed salt."""
+    return hashlib.sha256((password + _PASSWORD_SALT).encode()).hexdigest()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify a plaintext password against a SHA-256 hash."""
+    return hash_password(password) == hashed
+
+
+# ── Brute-force protection ────────────────────────────────────────────
+
+_login_attempts: dict[str, list[float]] = {}
+_LOCKOUT_THRESHOLD = 5
+_LOCKOUT_WINDOW = 900  # 15 minutes
+
+
+def _check_brute_force(email: str) -> None:
+    """Raise 429 if too many recent failed login attempts."""
+    now = time.time()
+    attempts = _login_attempts.get(email, [])
+    recent = [t for t in attempts if now - t < _LOCKOUT_WINDOW]
+    _login_attempts[email] = recent
+    if len(recent) >= _LOCKOUT_THRESHOLD:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Try again in 15 minutes.",
+        )
+
+
+def _record_failed_attempt(email: str) -> None:
+    """Record a failed login attempt timestamp."""
+    now = time.time()
+    _login_attempts.setdefault(email, []).append(now)
+
+
+# ── Audit logging ─────────────────────────────────────────────────────
+
+_AUDIT_TABLE_CREATED = False
+
+
+async def _ensure_audit_table(conn) -> None:
+    """Create the auth_audit_log table if it doesn't exist (idempotent)."""
+    global _AUDIT_TABLE_CREATED
+    if _AUDIT_TABLE_CREATED:
+        return
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS auth_audit_log (
+            id BIGSERIAL PRIMARY KEY,
+            event_type VARCHAR(50) NOT NULL,
+            email VARCHAR(255),
+            customer_id VARCHAR(20),
+            ip_address VARCHAR(50),
+            user_agent TEXT,
+            success BOOLEAN NOT NULL,
+            details TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    _AUDIT_TABLE_CREATED = True
+
+
+async def _audit_log(
+    event_type: str,
+    email: str | None = None,
+    customer_id: str | None = None,
+    success: bool = True,
+    details: str | None = None,
+) -> None:
+    """Write an audit log entry. Silently ignores errors."""
+    try:
+        async with acquire() as conn:
+            await _ensure_audit_table(conn)
+            await conn.execute(
+                "INSERT INTO auth_audit_log (event_type, email, customer_id, success, details) "
+                "VALUES ($1, $2, $3, $4, $5)",
+                event_type, email, customer_id, success, details,
+            )
+    except Exception:
+        pass  # Don't fail the main operation if audit logging fails
+
+
+# ── Rate-limit headers helper ─────────────────────────────────────────
+
+def _set_rate_limit_headers(response: Response) -> None:
+    """Add static rate-limit headers to a response."""
+    response.headers["X-RateLimit-Limit"] = "100"
+    response.headers["X-RateLimit-Remaining"] = "99"
+    response.headers["X-RateLimit-Reset"] = str(int(time.time()) + 60)
+
+
+# ── Auth codes table ──────────────────────────────────────────────────
+
+_AUTH_CODES_TABLE_CREATED = False
+
+
+async def _ensure_auth_codes_table(conn) -> None:
+    """Create the auth_codes table if it doesn't exist (idempotent)."""
+    global _AUTH_CODES_TABLE_CREATED
+    if _AUTH_CODES_TABLE_CREATED:
+        return
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS auth_codes (
+            code VARCHAR(64) PRIMARY KEY,
+            consent_id UUID NOT NULL,
+            customer_id VARCHAR(20) NOT NULL,
+            client_id VARCHAR(100) NOT NULL,
+            redirect_uri TEXT NOT NULL,
+            used BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '60 seconds'
+        )
+    """)
+    _AUTH_CODES_TABLE_CREATED = True
 
 
 # ── Request / Response models ───────────────────────────────────────────
@@ -79,6 +202,18 @@ class MasroofiUpdateBankRequest(BaseModel):
     email: str = Field(..., min_length=1, max_length=255)
     consent_id: str = Field("", max_length=100)
     bank_token: str = Field("", max_length=500)
+
+
+class AuthCodeGenerateRequest(BaseModel):
+    consent_id: str = Field(..., min_length=1)
+    customer_id: str = Field(..., min_length=1, max_length=20)
+    redirect_uri: str = Field(..., min_length=1)
+
+
+class AuthCodeExchangeRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=64)
+    client_id: str = Field(..., min_length=1, max_length=100)
+    client_secret: str = Field(..., min_length=1, max_length=255)
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────
@@ -291,25 +426,51 @@ async def delete_beneficiary(beneficiary_id: str):
 
 
 @router.post("/bank-auth/login")
-async def bank_auth_login(req: BankAuthLoginRequest) -> dict[str, Any]:
+async def bank_auth_login(req: BankAuthLoginRequest, response: Response) -> dict[str, Any]:
     """Authenticate a bank customer directly (no Keycloak redirect).
 
     Validates email + password against the ``customers`` table and returns
     customer info with their account list.
     """
+    _set_rate_limit_headers(response)
+    _check_brute_force(req.email)
+
     async with acquire() as conn:
         row = await conn.fetchrow(
             "SELECT customer_id, email, first_name, last_name, password FROM customers WHERE email = $1",
             req.email,
         )
 
-    if not row or row["password"] != req.password:
+    if not row:
+        _record_failed_attempt(req.email)
+        await _audit_log("bank_login_failed", email=req.email, success=False, details="Unknown email")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    stored_password = row["password"]
+
+    # On-the-fly migration: if stored password is not a hash (len != 64), hash it and UPDATE
+    if len(stored_password) != 64:
+        hashed = hash_password(stored_password)
+        async with acquire() as conn:
+            await conn.execute(
+                "UPDATE customers SET password = $1 WHERE customer_id = $2",
+                hashed, row["customer_id"],
+            )
+        stored_password = hashed
+
+    if not verify_password(req.password, stored_password):
+        _record_failed_attempt(req.email)
+        await _audit_log("bank_login_failed", email=req.email, customer_id=row["customer_id"], success=False, details="Wrong password")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
 
     customer_id = row["customer_id"]
+    await _audit_log("bank_login_success", email=req.email, customer_id=customer_id, success=True)
 
     # Fetch accounts for this customer
     async with acquire() as conn:
@@ -351,8 +512,10 @@ async def _ensure_masroofi_table(conn) -> None:
 
 
 @router.post("/masroofi/register", status_code=status.HTTP_201_CREATED)
-async def masroofi_register(req: MasroofiRegisterRequest) -> dict[str, Any]:
+async def masroofi_register(req: MasroofiRegisterRequest, response: Response) -> dict[str, Any]:
     """Register a new Masroofi user account."""
+    _set_rate_limit_headers(response)
+
     async with acquire() as conn:
         await _ensure_masroofi_table(conn)
 
@@ -367,14 +530,17 @@ async def masroofi_register(req: MasroofiRegisterRequest) -> dict[str, Any]:
             )
 
         now = datetime.now(_TZ_OMAN)
+        hashed_pw = hash_password(req.password)
         await conn.execute(
             """INSERT INTO masroofi_users (email, password, name, created_at)
                VALUES ($1, $2, $3, $4)""",
             req.email,
-            req.password,
+            hashed_pw,
             req.name,
             now,
         )
+
+    await _audit_log("masroofi_register", email=req.email, success=True)
 
     return {
         "email": req.email,
@@ -384,8 +550,11 @@ async def masroofi_register(req: MasroofiRegisterRequest) -> dict[str, Any]:
 
 
 @router.post("/masroofi/login")
-async def masroofi_login(req: MasroofiLoginRequest) -> dict[str, Any]:
+async def masroofi_login(req: MasroofiLoginRequest, response: Response) -> dict[str, Any]:
     """Login to a Masroofi user account."""
+    _set_rate_limit_headers(response)
+    _check_brute_force(req.email)
+
     async with acquire() as conn:
         await _ensure_masroofi_table(conn)
 
@@ -394,11 +563,35 @@ async def masroofi_login(req: MasroofiLoginRequest) -> dict[str, Any]:
             req.email,
         )
 
-    if not row or row["password"] != req.password:
+    if not row:
+        _record_failed_attempt(req.email)
+        await _audit_log("masroofi_login_failed", email=req.email, success=False, details="Unknown email")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    stored_password = row["password"]
+
+    # On-the-fly migration: if stored password is not a hash (len != 64), hash it and UPDATE
+    if len(stored_password) != 64:
+        hashed = hash_password(stored_password)
+        async with acquire() as conn:
+            await conn.execute(
+                "UPDATE masroofi_users SET password = $1 WHERE email = $2",
+                hashed, row["email"],
+            )
+        stored_password = hashed
+
+    if not verify_password(req.password, stored_password):
+        _record_failed_attempt(req.email)
+        await _audit_log("masroofi_login_failed", email=req.email, success=False, details="Wrong password")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    await _audit_log("masroofi_login_success", email=req.email, success=True)
 
     result = _row_to_dict(row)
     del result["password"]
@@ -427,6 +620,120 @@ async def masroofi_update_bank(req: MasroofiUpdateBankRequest) -> dict[str, Any]
         )
 
     return {"email": req.email, "status": "updated"}
+
+
+# ── Authorization Code Flow ───────────────────────────────────────────
+
+
+@router.post("/auth-codes/generate")
+async def auth_code_generate(req: AuthCodeGenerateRequest, response: Response) -> dict[str, Any]:
+    """Generate an authorization code for a consent.
+
+    The code is single-use and expires in 60 seconds.
+    """
+    _set_rate_limit_headers(response)
+    code = secrets.token_hex(16)  # 32-char hex string
+
+    async with acquire() as conn:
+        await _ensure_auth_codes_table(conn)
+
+        # Determine the client_id from the consent's TPP
+        consent_row = await conn.fetchrow(
+            "SELECT tpp_id FROM consents WHERE consent_id = $1",
+            uuid.UUID(req.consent_id),
+        )
+        client_id = consent_row["tpp_id"] if consent_row else "unknown"
+
+        await conn.execute(
+            """INSERT INTO auth_codes (code, consent_id, customer_id, client_id, redirect_uri)
+               VALUES ($1, $2, $3, $4, $5)""",
+            code,
+            uuid.UUID(req.consent_id),
+            req.customer_id,
+            client_id,
+            req.redirect_uri,
+        )
+
+    await _audit_log(
+        "auth_code_generated",
+        customer_id=req.customer_id,
+        success=True,
+        details=f"consent={req.consent_id}",
+    )
+
+    return {"code": code, "expires_in": 60}
+
+
+@router.post("/auth-codes/exchange")
+async def auth_code_exchange(req: AuthCodeExchangeRequest, response: Response) -> dict[str, Any]:
+    """Exchange an authorization code for an access token.
+
+    Validates: code exists, not used, not expired, client_id matches.
+    Marks the code as used. Returns consent_id and a token.
+    """
+    _set_rate_limit_headers(response)
+
+    async with acquire() as conn:
+        await _ensure_auth_codes_table(conn)
+
+        row = await conn.fetchrow(
+            "SELECT code, consent_id, customer_id, client_id, redirect_uri, used, expires_at "
+            "FROM auth_codes WHERE code = $1",
+            req.code,
+        )
+
+    if not row:
+        await _audit_log("auth_code_expired", success=False, details=f"code={req.code[:8]}... not found")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization code")
+
+    if row["used"]:
+        await _audit_log("auth_code_expired", success=False, details=f"code={req.code[:8]}... already used")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization code already used")
+
+    now = datetime.now(timezone.utc)
+    if now > row["expires_at"].replace(tzinfo=timezone.utc):
+        await _audit_log("auth_code_expired", success=False, details=f"code={req.code[:8]}... expired")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization code expired")
+
+    if row["client_id"] != req.client_id:
+        await _audit_log("auth_code_expired", success=False, details=f"client_id mismatch: {req.client_id}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Client ID mismatch")
+
+    # Mark code as used
+    async with acquire() as conn:
+        await conn.execute("UPDATE auth_codes SET used = TRUE WHERE code = $1", req.code)
+
+    consent_id = str(row["consent_id"])
+
+    # Determine scope from the consent
+    scope = "accounts"
+    try:
+        async with acquire() as conn:
+            consent_row = await conn.fetchrow(
+                "SELECT consent_type FROM consents WHERE consent_id = $1",
+                row["consent_id"],
+            )
+        if consent_row:
+            ct = consent_row["consent_type"]
+            if "payment" in ct:
+                scope = "payments"
+    except Exception:
+        pass
+
+    await _audit_log(
+        "auth_code_exchanged",
+        customer_id=row["customer_id"],
+        success=True,
+        details=f"consent={consent_id}",
+    )
+
+    return {
+        "access_token": consent_id,
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "consent_id": consent_id,
+        "scope": scope,
+    }
 
 
 # ── Transfers ───────────────────────────────────────────────────────────

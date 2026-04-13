@@ -154,9 +154,8 @@ export default function ConsentApproval() {
       if (state) {
         url.searchParams.set('state', state);
       }
-      if (consentId) {
-        url.searchParams.set('consent_id', consentId);
-      }
+      // consent_id is NOT passed in the redirect — fintechs obtain it
+      // via the auth code exchange endpoint (security hardening)
       window.location.href = url.toString();
     },
     [redirectUri, state, navigate],
@@ -189,10 +188,23 @@ export default function ConsentApproval() {
         icon: <IconCheck size={16} />,
       });
 
-      // Generate a pseudo auth code from the consent ID for the redirect
-      // In production, the consent service would return a real authorization code
-      const authCode = `authz_${consentId?.slice(0, 8)}`;
-      handleRedirect(authCode);
+      // Generate a real authorization code via the consent service
+      const codeResp = await fetch('/api/auth-codes/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          consent_id: consentId,
+          customer_id: customerId,
+          redirect_uri: redirectUri || '',
+        }),
+      });
+
+      if (!codeResp.ok) {
+        throw new Error('Failed to generate authorization code');
+      }
+
+      const { code } = await codeResp.json();
+      handleRedirect(code);
     } catch (err) {
       notifications.show({
         title: 'Authorization Failed',

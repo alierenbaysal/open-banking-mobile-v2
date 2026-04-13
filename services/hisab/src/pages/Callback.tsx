@@ -13,7 +13,7 @@ import {
   ThemeIcon,
 } from '@mantine/core';
 import { IconCheck, IconAlertCircle } from '@tabler/icons-react';
-import { exchangeToken, validateState, storeCredentials } from '@/utils/consent';
+import { exchangeAuthCode, validateState, storeCredentials } from '@/utils/consent';
 
 type CallbackState = 'processing' | 'success' | 'error';
 
@@ -28,15 +28,14 @@ export default function Callback() {
       try {
         const code = searchParams.get('code');
         const stateParam = searchParams.get('state');
-        const consentId = searchParams.get('consent_id');
 
-        if (!code && !consentId) {
+        if (!code) {
           // Check for error response from BD Online
           const errorParam = searchParams.get('error');
           if (errorParam) {
             throw new Error(`Authorization denied: ${searchParams.get('error_description') || errorParam}`);
           }
-          throw new Error('Missing authorization code or consent ID in callback');
+          throw new Error('Missing authorization code in callback');
         }
 
         // Validate state parameter (CSRF protection)
@@ -47,18 +46,11 @@ export default function Callback() {
           }
         }
 
-        // Exchange code for token
-        let token: string;
-        if (code) {
-          token = await exchangeToken(code);
-        } else {
-          // For demo: use consent_id as token if no code provided
-          token = consentId || 'demo-token';
-        }
+        // Exchange authorization code for access token
+        const { access_token, consent_id } = await exchangeAuthCode(code);
 
         // Store credentials
-        const finalConsentId = consentId || 'consent-from-callback';
-        storeCredentials(token, finalConsentId);
+        storeCredentials(access_token, consent_id);
 
         setState('success');
 

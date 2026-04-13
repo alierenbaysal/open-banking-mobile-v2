@@ -44,6 +44,7 @@ export default function PaymentCallback() {
   useEffect(() => {
     const processCallback = async () => {
       try {
+        const code = searchParams.get('code');
         const callbackConsentId = searchParams.get('consent_id');
         const state = searchParams.get('state');
         const errorParam = searchParams.get('error');
@@ -66,8 +67,29 @@ export default function PaymentCallback() {
           return;
         }
 
+        // Exchange authorization code for consent details
+        let resolvedConsentId = callbackConsentId || '';
+        if (code) {
+          const exchangeResp = await fetch('/api/auth-codes/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              client_id: 'sadad-payment-gateway',
+              client_secret: 'sadad-gateway-secret-tnd',
+            }),
+          });
+
+          if (!exchangeResp.ok) {
+            throw new Error('Failed to exchange authorization code');
+          }
+
+          const exchangeData = await exchangeResp.json();
+          resolvedConsentId = exchangeData.consent_id;
+        }
+
         // Retrieve stored payment context
-        const storedConsentId = callbackConsentId || getStoredConsentId() || '';
+        const storedConsentId = resolvedConsentId || getStoredConsentId() || '';
         const storedOrderRef = getStoredOrderRef() || '';
 
         if (!storedConsentId) {

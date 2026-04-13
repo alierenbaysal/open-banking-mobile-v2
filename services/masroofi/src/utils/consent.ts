@@ -83,34 +83,35 @@ export function buildConsentRedirectUrl(consentId: string): string {
 }
 
 /**
- * Exchange an authorization code for an access token via Keycloak.
- * In the demo, the mock adapter accepts any Bearer token, so we
- * can also just use the consent_id as the token.
+ * Exchange an authorization code for an access token via the consent service auth-codes endpoint.
  */
-export async function exchangeToken(authCode: string): Promise<string> {
-  try {
-    const response = await fetch(KEYCLOAK_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: authCode,
-        redirect_uri: MASROOFI_REDIRECT_URI,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-      }),
-    });
+export async function exchangeAuthCode(code: string): Promise<{ access_token: string; consent_id: string }> {
+  const response = await fetch('/api/auth-codes/exchange', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      code,
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+    }),
+  });
 
-    if (response.ok) {
-      const data = await response.json();
-      return data.access_token;
-    }
-  } catch {
-    // Token exchange failed — fall through to use auth code as token
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Token exchange failed: ${response.status} ${text}`);
   }
 
-  // For demo: use the auth code itself as the bearer token
-  return authCode;
+  const data = await response.json();
+  return { access_token: data.access_token, consent_id: data.consent_id };
+}
+
+/**
+ * Exchange an authorization code for an access token via Keycloak (legacy).
+ * @deprecated Use exchangeAuthCode instead.
+ */
+export async function exchangeToken(authCode: string): Promise<string> {
+  const result = await exchangeAuthCode(authCode);
+  return result.access_token;
 }
 
 /**
