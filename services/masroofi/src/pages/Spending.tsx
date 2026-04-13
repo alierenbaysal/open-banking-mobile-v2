@@ -13,14 +13,25 @@ import {
   Alert,
   ThemeIcon,
   SimpleGrid,
+  RingProgress,
+  Progress,
+  Badge,
+  Divider,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { IconAlertCircle, IconTrendingDown, IconTrendingUp, IconChartPie } from '@tabler/icons-react';
+import {
+  IconAlertCircle,
+  IconTrendingDown,
+  IconArrowUpRight,
+  IconArrowDownRight,
+  IconReceipt,
+  IconPigMoney,
+} from '@tabler/icons-react';
 import { getAllTransactions } from '@/utils/api';
 import type { OBTransaction } from '@/utils/api';
 import { isBankConnected } from '@/utils/consent';
-import { buildSpendingSummary, categorizeTransaction } from '@/utils/categories';
-import SpendingChart from '@/components/SpendingChart';
+import { buildSpendingSummary, buildMerchantSummary, getCategoryEmoji } from '@/utils/categories';
+// types used internally via the build* helpers
 import EmptyState from '@/components/EmptyState';
 
 function formatAmount(amount: number, currency: string = 'OMR'): string {
@@ -40,7 +51,13 @@ function getMonthTransactions(transactions: OBTransaction[], monthsBack: number 
 function getMonthLabel(monthsBack: number): string {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
-  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function getMonthShortLabel(monthsBack: number): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+  return d.toLocaleDateString('en-US', { month: 'short' });
 }
 
 export default function Spending() {
@@ -52,24 +69,24 @@ export default function Spending() {
     enabled: connected,
   });
 
-  const { thisMonth, lastMonth, thisMonthSummary, lastMonthSummary, topCategory, currency } = useMemo(() => {
+  const analysis = useMemo(() => {
     const allTx = transactions || [];
-    const thisTx = getMonthTransactions(allTx, 0);
-    const lastTx = getMonthTransactions(allTx, 1);
-    const thisSummary = buildSpendingSummary(thisTx);
-    const lastSummary = buildSpendingSummary(lastTx);
 
-    // Determine most-used currency
+    // Current and past months
+    const months = [0, 1, 2].map((m) => {
+      const tx = getMonthTransactions(allTx, m);
+      const summary = buildSpendingSummary(tx);
+      const spending = summary.reduce((s, v) => s + v.total, 0);
+      const income = tx
+        .filter((t) => t.CreditDebitIndicator === 'Credit')
+        .reduce((s, t) => s + parseFloat(t.Amount.Amount), 0);
+      return { tx, summary, spending, income, label: getMonthLabel(m), shortLabel: getMonthShortLabel(m) };
+    });
+
     const curr = allTx[0]?.Amount?.Currency || 'OMR';
+    const merchants = buildMerchantSummary(months[0].tx, 10);
 
-    return {
-      thisMonth: thisTx,
-      lastMonth: lastTx,
-      thisMonthSummary: thisSummary,
-      lastMonthSummary: lastSummary,
-      topCategory: thisSummary[0] || null,
-      currency: curr,
-    };
+    return { months, currency: curr, merchants };
   }, [transactions]);
 
   if (!connected) {
@@ -81,26 +98,32 @@ export default function Spending() {
     );
   }
 
-  const thisMonthTotal = thisMonthSummary.reduce((s, v) => s + v.total, 0);
-  const lastMonthTotal = lastMonthSummary.reduce((s, v) => s + v.total, 0);
-  const changePercent = lastMonthTotal > 0
-    ? ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100
+  const { months, currency, merchants } = analysis;
+  const [thisMonth, lastMonth, twoMonthsAgo] = months;
+
+  const changePercent = lastMonth.spending > 0
+    ? ((thisMonth.spending - lastMonth.spending) / lastMonth.spending) * 100
     : 0;
 
-  const thisMonthIncome = thisMonth
-    .filter((t) => t.CreditDebitIndicator === 'Credit')
-    .reduce((s, t) => s + parseFloat(t.Amount.Amount), 0);
-
-  const savingsRate = thisMonthIncome > 0
-    ? ((thisMonthIncome - thisMonthTotal) / thisMonthIncome) * 100
+  const savingsRate = thisMonth.income > 0
+    ? ((thisMonth.income - thisMonth.spending) / thisMonth.income) * 100
     : 0;
+
+  const maxMonthSpending = Math.max(thisMonth.spending, lastMonth.spending, twoMonthsAgo.spending, 1);
+
+  // Ring segments for donut
+  const ringSegments = thisMonth.summary.slice(0, 8).map((item) => ({
+    value: Math.max(item.percentage, 1),
+    color: item.category.color,
+    tooltip: `${item.category.name}: ${item.percentage.toFixed(1)}%`,
+  }));
 
   return (
     <Container size="lg" py="xl">
       <Stack gap="xl">
         <Box>
           <Title order={2}>Spending Analysis</Title>
-          <Text size="sm" c="dimmed">تحليل المصاريف - {getMonthLabel(0)}</Text>
+          <Text size="sm" c="dimmed">{'\u062A\u062D\u0644\u064A\u0644 \u0627\u0644\u0645\u0635\u0627\u0631\u064A\u0641'} - {thisMonth.label}</Text>
         </Box>
 
         {error && (
@@ -109,9 +132,16 @@ export default function Spending() {
           </Alert>
         )}
 
-        {/* Summary Cards */}
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="lg">
-          <Paper shadow="sm" p="lg" radius="md" withBorder>
+        {/* ── Top Stats Row ── */}
+        <SimpleGrid cols={{ base: 2, md: 4 }} spacing="lg">
+          {/* This month spending */}
+          <Paper
+            shadow="sm"
+            p="lg"
+            radius="md"
+            withBorder
+            style={{ borderLeft: '4px solid #e17055' }}
+          >
             <Group justify="space-between" mb="sm">
               <Text size="xs" tt="uppercase" fw={600} c="dimmed">This Month</Text>
               <ThemeIcon size={32} radius="md" variant="light" color="red">
@@ -121,27 +151,39 @@ export default function Spending() {
             {isLoading ? (
               <Skeleton height={28} />
             ) : (
-              <Text size="lg" fw={700} c="red">{formatAmount(thisMonthTotal, currency)}</Text>
+              <Text size="lg" fw={700} c="red" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {formatAmount(thisMonth.spending, currency)}
+              </Text>
             )}
-            <Text size="xs" c="dimmed" mt={4}>{thisMonth.filter((t) => t.CreditDebitIndicator === 'Debit').length} transactions</Text>
+            <Text size="xs" c="dimmed" mt={4}>
+              {thisMonth.tx.filter((t) => t.CreditDebitIndicator === 'Debit').length} transactions
+            </Text>
           </Paper>
 
+          {/* Last month */}
           <Paper shadow="sm" p="lg" radius="md" withBorder>
             <Group justify="space-between" mb="sm">
               <Text size="xs" tt="uppercase" fw={600} c="dimmed">Last Month</Text>
               <ThemeIcon size={32} radius="md" variant="light" color="gray">
-                <IconTrendingDown size={18} />
+                <IconReceipt size={18} />
               </ThemeIcon>
             </Group>
             {isLoading ? (
               <Skeleton height={28} />
             ) : (
-              <Text size="lg" fw={700}>{formatAmount(lastMonthTotal, currency)}</Text>
+              <Text size="lg" fw={700} style={{ fontVariantNumeric: 'tabular-nums' }}>{formatAmount(lastMonth.spending, currency)}</Text>
             )}
-            <Text size="xs" c="dimmed" mt={4}>{getMonthLabel(1)}</Text>
+            <Text size="xs" c="dimmed" mt={4}>{lastMonth.label}</Text>
           </Paper>
 
-          <Paper shadow="sm" p="lg" radius="md" withBorder>
+          {/* Change */}
+          <Paper
+            shadow="sm"
+            p="lg"
+            radius="md"
+            withBorder
+            style={{ borderLeft: `4px solid ${changePercent > 0 ? '#e17055' : '#00b894'}` }}
+          >
             <Group justify="space-between" mb="sm">
               <Text size="xs" tt="uppercase" fw={600} c="dimmed">Change</Text>
               <ThemeIcon
@@ -150,7 +192,7 @@ export default function Spending() {
                 variant="light"
                 color={changePercent > 0 ? 'red' : 'teal'}
               >
-                {changePercent > 0 ? <IconTrendingUp size={18} /> : <IconTrendingDown size={18} />}
+                {changePercent > 0 ? <IconArrowUpRight size={18} /> : <IconArrowDownRight size={18} />}
               </ThemeIcon>
             </Group>
             {isLoading ? (
@@ -167,11 +209,23 @@ export default function Spending() {
             <Text size="xs" c="dimmed" mt={4}>vs last month</Text>
           </Paper>
 
-          <Paper shadow="sm" p="lg" radius="md" withBorder>
+          {/* Savings Rate */}
+          <Paper
+            shadow="sm"
+            p="lg"
+            radius="md"
+            withBorder
+            style={{ borderLeft: `4px solid ${savingsRate >= 20 ? '#00b894' : savingsRate >= 10 ? '#fdcb6e' : '#e17055'}` }}
+          >
             <Group justify="space-between" mb="sm">
               <Text size="xs" tt="uppercase" fw={600} c="dimmed">Savings Rate</Text>
-              <ThemeIcon size={32} radius="md" variant="light" color="teal">
-                <IconChartPie size={18} />
+              <ThemeIcon
+                size={32}
+                radius="md"
+                variant="light"
+                color={savingsRate >= 20 ? 'teal' : savingsRate >= 10 ? 'yellow' : 'red'}
+              >
+                <IconPigMoney size={18} />
               </ThemeIcon>
             </Group>
             {isLoading ? (
@@ -180,149 +234,304 @@ export default function Spending() {
               <Text
                 size="lg"
                 fw={700}
-                c={savingsRate >= 0 ? 'teal' : 'red'}
+                c={savingsRate >= 20 ? 'teal' : savingsRate >= 10 ? 'yellow.8' : 'red'}
               >
                 {savingsRate.toFixed(1)}%
               </Text>
             )}
-            <Text size="xs" c="dimmed" mt={4}>of income saved</Text>
+            <Text size="xs" c="dimmed" mt={4}>
+              {savingsRate >= 20 ? 'Excellent!' : savingsRate >= 10 ? 'Good' : 'Needs attention'}
+            </Text>
           </Paper>
         </SimpleGrid>
 
         <Grid gutter="xl">
-          {/* Spending Breakdown */}
+          {/* ── Left Column: Donut + Category Cards ── */}
           <Grid.Col span={{ base: 12, md: 7 }}>
-            <Card shadow="sm" radius="md" withBorder>
-              <Box mb="lg">
-                <Text fw={600} size="lg">Spending Breakdown</Text>
-                <Text size="xs" c="dimmed">تفصيل المصاريف - {getMonthLabel(0)}</Text>
-              </Box>
-              {isLoading ? (
-                <Stack gap="md">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Skeleton key={i} height={40} />
-                  ))}
-                </Stack>
-              ) : thisMonthSummary.length > 0 ? (
-                <SpendingChart data={thisMonthSummary} currency={currency} />
-              ) : (
-                <Text c="dimmed" ta="center" py="xl">No spending data this month</Text>
-              )}
-            </Card>
+            <Stack gap="lg">
+              {/* Donut Chart */}
+              <Card shadow="sm" radius="md" withBorder>
+                <Box mb="md">
+                  <Text fw={600} size="lg">Spending Breakdown</Text>
+                  <Text size="xs" c="dimmed">{'\u062A\u0641\u0635\u064A\u0644 \u0627\u0644\u0645\u0635\u0627\u0631\u064A\u0641'} - {thisMonth.label}</Text>
+                </Box>
+                {isLoading ? (
+                  <Stack gap="md">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Skeleton key={i} height={40} />
+                    ))}
+                  </Stack>
+                ) : thisMonth.summary.length > 0 ? (
+                  <Stack gap="lg">
+                    {/* Big donut */}
+                    <Group justify="center" py="md">
+                      <RingProgress
+                        size={220}
+                        thickness={22}
+                        roundCaps
+                        sections={ringSegments}
+                        label={
+                          <Box ta="center">
+                            <Text size="xs" c="dimmed" lh={1}>Total Spent</Text>
+                            <Text size="lg" fw={700} lh={1.3} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {formatAmount(thisMonth.spending, currency)}
+                            </Text>
+                            <Text size="xs" c="dimmed" lh={1}>
+                              {thisMonth.summary.reduce((s, d) => s + d.count, 0)} txn
+                            </Text>
+                          </Box>
+                        }
+                      />
+                    </Group>
+
+                    {/* Category cards grid */}
+                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                      {thisMonth.summary.map((item) => {
+                        const emoji = getCategoryEmoji(item.category.id);
+                        return (
+                          <Paper
+                            key={item.category.id}
+                            p="sm"
+                            radius="md"
+                            withBorder
+                            style={{
+                              borderLeftColor: item.category.color,
+                              borderLeftWidth: 3,
+                              transition: 'transform 0.15s, box-shadow 0.15s',
+                            }}
+                          >
+                            <Group justify="space-between" mb={4} wrap="nowrap">
+                              <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+                                <Text size="xl" style={{ lineHeight: 1 }}>{emoji}</Text>
+                                <Box style={{ minWidth: 0 }}>
+                                  <Text size="sm" fw={600} truncate="end">{item.category.name}</Text>
+                                  <Text size="xs" c="dimmed">{item.category.nameAr}</Text>
+                                </Box>
+                              </Group>
+                              <Box style={{ textAlign: 'right', flexShrink: 0 }}>
+                                <Text size="sm" fw={700} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                  {formatAmount(item.total, currency)}
+                                </Text>
+                                <Badge size="xs" variant="light" color={item.category.color}>
+                                  {item.percentage.toFixed(1)}%
+                                </Badge>
+                              </Box>
+                            </Group>
+                            <Progress
+                              value={item.percentage}
+                              color={item.category.color}
+                              size="xs"
+                              radius="xl"
+                              mt={4}
+                            />
+                          </Paper>
+                        );
+                      })}
+                    </SimpleGrid>
+                  </Stack>
+                ) : (
+                  <Text c="dimmed" ta="center" py="xl">No spending data this month</Text>
+                )}
+              </Card>
+            </Stack>
           </Grid.Col>
 
-          {/* Insights */}
+          {/* ── Right Column: Merchants, Trend, Tips ── */}
           <Grid.Col span={{ base: 12, md: 5 }}>
             <Stack gap="lg">
-              {/* Top Spending Category */}
-              {topCategory && !isLoading && (
-                <Card shadow="sm" radius="md" withBorder>
-                  <Text fw={600} size="sm" mb="md">Top Spending Category</Text>
-                  <Group gap="md">
-                    <Box
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: '50%',
-                        backgroundColor: `${topCategory.category.color}20`,
-                        border: `3px solid ${topCategory.category.color}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Text fw={700} size="lg" style={{ color: topCategory.category.color }}>
-                        {topCategory.percentage.toFixed(0)}%
+              {/* Monthly Trend — 3 month bar comparison */}
+              <Card shadow="sm" radius="md" withBorder>
+                <Text fw={600} size="sm" mb="md">Monthly Trend / {'\u0627\u0644\u0627\u062A\u062C\u0627\u0647 \u0627\u0644\u0634\u0647\u0631\u064A'}</Text>
+                {isLoading ? (
+                  <Skeleton height={100} />
+                ) : (
+                  <Stack gap="sm">
+                    {months.map((m, i) => (
+                      <Box key={i}>
+                        <Group justify="space-between" mb={4}>
+                          <Group gap="xs">
+                            <Text size="sm" fw={i === 0 ? 600 : 400}>{m.shortLabel}</Text>
+                            {i === 0 && <Badge size="xs" variant="filled" color="violet">Current</Badge>}
+                          </Group>
+                          <Text size="sm" fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {formatAmount(m.spending, currency)}
+                          </Text>
+                        </Group>
+                        <Box
+                          style={{
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: 'var(--mantine-color-gray-1)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <Box
+                            style={{
+                              height: '100%',
+                              width: `${Math.max(2, (m.spending / maxMonthSpending) * 100)}%`,
+                              borderRadius: 10,
+                              background: i === 0
+                                ? 'linear-gradient(90deg, #6C5CE7, #a29bfe)'
+                                : i === 1
+                                ? '#a29bfe'
+                                : '#d0bfff',
+                              transition: 'width 0.8s ease-out',
+                            }}
+                          />
+                        </Box>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </Card>
+
+              {/* Top Merchants */}
+              <Card shadow="sm" radius="md" withBorder>
+                <Text fw={600} size="sm" mb="md">Top Merchants / {'\u0623\u0643\u062B\u0631 \u0627\u0644\u062A\u062C\u0627\u0631'}</Text>
+                {isLoading ? (
+                  <Stack gap="sm">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Skeleton key={i} height={36} />
+                    ))}
+                  </Stack>
+                ) : merchants.length === 0 ? (
+                  <Text c="dimmed" size="sm" ta="center" py="md">No merchant data</Text>
+                ) : (
+                  <Stack gap={0}>
+                    {merchants.map((m, i) => (
+                      <Group
+                        key={i}
+                        justify="space-between"
+                        py="xs"
+                        px="xs"
+                        style={{
+                          borderBottom: i < merchants.length - 1 ? '1px solid var(--mantine-color-gray-1)' : 'none',
+                        }}
+                        wrap="nowrap"
+                      >
+                        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                          <Box
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 6,
+                              background: `${m.category.color}20`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Text size="xs">{getCategoryEmoji(m.category.id)}</Text>
+                          </Box>
+                          <Box style={{ minWidth: 0 }}>
+                            <Text size="sm" fw={500} truncate="end">{m.name}</Text>
+                            <Text size="xs" c="dimmed">{m.count} transaction{m.count !== 1 ? 's' : ''}</Text>
+                          </Box>
+                        </Group>
+                        <Text size="sm" fw={600} style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                          {formatAmount(m.total, currency)}
+                        </Text>
+                      </Group>
+                    ))}
+                  </Stack>
+                )}
+              </Card>
+
+              {/* Savings Insight Card */}
+              {!isLoading && (
+                <Card
+                  shadow="sm"
+                  radius="md"
+                  withBorder
+                  style={{
+                    background: savingsRate >= 20
+                      ? 'linear-gradient(135deg, #e8f8f5, #d4efdf)'
+                      : savingsRate >= 10
+                      ? 'linear-gradient(135deg, #fef9e7, #fdebd0)'
+                      : 'linear-gradient(135deg, #fdedec, #fadbd8)',
+                    border: 'none',
+                  }}
+                >
+                  <Group gap="md" wrap="nowrap">
+                    <RingProgress
+                      size={80}
+                      thickness={8}
+                      roundCaps
+                      sections={[
+                        {
+                          value: Math.min(Math.max(savingsRate, 0), 100),
+                          color: savingsRate >= 20 ? '#00b894' : savingsRate >= 10 ? '#f39c12' : '#e17055',
+                        },
+                      ]}
+                      label={
+                        <Text size="xs" fw={700} ta="center" lh={1}>
+                          {savingsRate.toFixed(0)}%
+                        </Text>
+                      }
+                    />
+                    <Box style={{ flex: 1 }}>
+                      <Text fw={600} size="sm">
+                        {savingsRate >= 20
+                          ? 'Great Savings!'
+                          : savingsRate >= 10
+                          ? 'On Track'
+                          : 'Room to Improve'}
                       </Text>
-                    </Box>
-                    <Box>
-                      <Text fw={600}>{topCategory.category.name}</Text>
-                      <Text size="xs" c="dimmed">{topCategory.category.nameAr}</Text>
-                      <Text size="sm" fw={600} mt={2}>
-                        {formatAmount(topCategory.total, currency)}
+                      <Text size="xs" c="dimmed" mt={2}>
+                        {savingsRate >= 20
+                          ? 'You\'re saving well above the recommended 20%. Consider investing your surplus.'
+                          : savingsRate >= 10
+                          ? 'Good progress! Try reducing your top spending category to reach 20%.'
+                          : 'Try setting a monthly spending budget for your top 3 categories.'}
+                      </Text>
+                      <Text size="xs" c="dimmed" mt={4}>
+                        {savingsRate >= 20
+                          ? '\u0645\u0639\u062F\u0644 \u0627\u062F\u062E\u0627\u0631 \u0645\u0645\u062A\u0627\u0632!'
+                          : savingsRate >= 10
+                          ? '\u0628\u062F\u0627\u064A\u0629 \u062C\u064A\u062F\u0629!'
+                          : '\u062D\u0627\u0648\u0644 \u062A\u0642\u0644\u064A\u0644 \u0627\u0644\u0645\u0635\u0627\u0631\u064A\u0641'}
                       </Text>
                     </Box>
                   </Group>
                 </Card>
               )}
 
-              {/* Month Comparison */}
-              <Card shadow="sm" radius="md" withBorder>
-                <Text fw={600} size="sm" mb="md">Month-over-Month</Text>
-                {isLoading ? (
-                  <Skeleton height={80} />
-                ) : (
-                  <Stack gap="sm">
-                    <Box>
-                      <Group justify="space-between" mb={4}>
-                        <Text size="sm">{getMonthLabel(0)}</Text>
-                        <Text size="sm" fw={600}>{formatAmount(thisMonthTotal, currency)}</Text>
-                      </Group>
-                      <Box
-                        style={{
-                          height: 16,
-                          borderRadius: 8,
-                          backgroundColor: 'var(--mantine-color-gray-1)',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <Box
-                          style={{
-                            height: '100%',
-                            width: `${Math.min(100, lastMonthTotal > 0 ? (thisMonthTotal / Math.max(thisMonthTotal, lastMonthTotal)) * 100 : 50)}%`,
-                            borderRadius: 8,
-                            backgroundColor: '#6C5CE7',
-                            transition: 'width 0.6s ease-out',
-                          }}
-                        />
-                      </Box>
+              {/* Income vs Spending visual */}
+              {!isLoading && (
+                <Card shadow="sm" radius="md" withBorder>
+                  <Text fw={600} size="sm" mb="md">Income vs Spending</Text>
+                  <Group justify="space-around" mb="md">
+                    <Box ta="center">
+                      <Text size="xs" c="dimmed" mb={4}>Income</Text>
+                      <Text size="lg" fw={700} c="teal" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {formatAmount(thisMonth.income, currency)}
+                      </Text>
                     </Box>
-                    <Box>
-                      <Group justify="space-between" mb={4}>
-                        <Text size="sm">{getMonthLabel(1)}</Text>
-                        <Text size="sm" fw={600}>{formatAmount(lastMonthTotal, currency)}</Text>
-                      </Group>
-                      <Box
-                        style={{
-                          height: 16,
-                          borderRadius: 8,
-                          backgroundColor: 'var(--mantine-color-gray-1)',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <Box
-                          style={{
-                            height: '100%',
-                            width: `${Math.min(100, thisMonthTotal > 0 ? (lastMonthTotal / Math.max(thisMonthTotal, lastMonthTotal)) * 100 : 50)}%`,
-                            borderRadius: 8,
-                            backgroundColor: '#a29bfe',
-                            transition: 'width 0.6s ease-out',
-                          }}
-                        />
-                      </Box>
+                    <Divider orientation="vertical" />
+                    <Box ta="center">
+                      <Text size="xs" c="dimmed" mb={4}>Spending</Text>
+                      <Text size="lg" fw={700} c="red" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {formatAmount(thisMonth.spending, currency)}
+                      </Text>
                     </Box>
-                  </Stack>
-                )}
-              </Card>
-
-              {/* Quick Tips */}
-              <Card shadow="sm" radius="md" withBorder bg="violet.0">
-                <Text fw={600} size="sm" mb="sm" c="violet.8">Savings Tip</Text>
-                <Text size="sm" c="violet.7">
-                  {savingsRate < 10
-                    ? 'Try to save at least 10% of your monthly income. Set up automatic transfers to a savings account.'
-                    : savingsRate < 20
-                    ? 'Good start! Aim for 20% savings rate by reviewing your top spending categories.'
-                    : 'Excellent savings rate! Consider investing your surplus in Bank Dhofar investment products.'}
-                </Text>
-                <Text size="xs" c="violet.5" mt="xs">
-                  {savingsRate < 10
-                    ? 'حاول ادخار 10% على الأقل من دخلك الشهري'
-                    : savingsRate < 20
-                    ? 'بداية جيدة! حاول الوصول لمعدل ادخار 20%'
-                    : 'معدل ادخار ممتاز! فكر في استثمار الفائض'}
-                </Text>
-              </Card>
+                  </Group>
+                  <Progress.Root size="xl" radius="xl">
+                    <Progress.Section
+                      value={thisMonth.income > 0 ? (thisMonth.income / (thisMonth.income + thisMonth.spending)) * 100 : 50}
+                      color="teal"
+                    >
+                      <Progress.Label>Income</Progress.Label>
+                    </Progress.Section>
+                    <Progress.Section
+                      value={thisMonth.spending > 0 ? (thisMonth.spending / (thisMonth.income + thisMonth.spending)) * 100 : 50}
+                      color="red"
+                    >
+                      <Progress.Label>Spending</Progress.Label>
+                    </Progress.Section>
+                  </Progress.Root>
+                </Card>
+              )}
             </Stack>
           </Grid.Col>
         </Grid>
