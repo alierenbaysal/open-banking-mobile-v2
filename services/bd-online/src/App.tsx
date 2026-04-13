@@ -115,7 +115,8 @@ function AuthCallback() {
         }
         navigate('/dashboard', { replace: true });
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('OIDC callback failed:', err?.message || err);
         navigate('/login', { replace: true });
       });
   }, [navigate]);
