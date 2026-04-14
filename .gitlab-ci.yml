@@ -96,6 +96,9 @@ build-bd-online:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - services/bd-online/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
+      changes:
+        - services/bd-online/**/*
 
 build-masroofi:
   <<: *build_template
@@ -108,6 +111,9 @@ build-masroofi:
       --destination "${CI_REGISTRY_IMAGE}/masroofi:latest"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/masroofi/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
       changes:
         - services/masroofi/**/*
 
@@ -126,6 +132,9 @@ build-sadad:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - services/sadad/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
+      changes:
+        - services/sadad/**/*
 
 build-salalah-electronics:
   <<: *build_template
@@ -142,6 +151,9 @@ build-salalah-electronics:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - services/salalah-electronics/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
+      changes:
+        - services/salalah-electronics/**/*
 
 build-hisab:
   <<: *build_template
@@ -156,5 +168,8 @@ build-hisab:
       --cache=false
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/hisab/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
       changes:
         - services/hisab/**/*
