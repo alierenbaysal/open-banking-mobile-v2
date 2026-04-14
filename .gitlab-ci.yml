@@ -173,3 +173,25 @@ build-hisab:
     - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
       changes:
         - services/hisab/**/*
+
+# -----------------------------------------------------------------------
+# Expo Metro mobile app images — consumed by the DMZ Metro platform
+# (#379). Image tag is the image name expected by the Helm instance in
+# overlays/oci-bankdhofar-muscat-tnd/values.yaml: expo-metro-<app>.
+# -----------------------------------------------------------------------
+build-sadad-mobile:
+  <<: *build_template
+  script:
+    - >
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/services/sadad-mobile"
+      --dockerfile "${CI_PROJECT_DIR}/services/sadad-mobile/Dockerfile"
+      --destination "harbor.cp.bankdhofar.com/devx/expo-metro-sadad:${CI_COMMIT_SHORT_SHA}"
+      --destination "harbor.cp.bankdhofar.com/devx/expo-metro-sadad:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/sadad-mobile/**/*
+    - if: $CI_COMMIT_BRANCH == "feature/mobile-sadad"
+      changes:
+        - services/sadad-mobile/**/*
