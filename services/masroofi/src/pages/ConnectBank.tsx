@@ -31,9 +31,9 @@ import { createConsent, buildConsentRedirectUrl, isBankConnected } from '@/utils
 import { useNavigate } from 'react-router-dom';
 
 const PERMISSIONS = [
-  { label: 'View account details', labelAr: 'عرض تفاصيل الحساب', icon: IconCreditCard },
-  { label: 'View account balances', labelAr: 'عرض أرصدة الحسابات', icon: IconEye },
-  { label: 'View transaction history', labelAr: 'عرض سجل المعاملات', icon: IconReceipt },
+  { label: 'View account details', icon: IconCreditCard },
+  { label: 'View account balances', icon: IconEye },
+  { label: 'View transaction history', icon: IconReceipt },
 ];
 
 export default function ConnectBank() {
@@ -94,10 +94,7 @@ export default function ConnectBank() {
   return (
     <Container size="md" py="xl">
       <Stack gap="xl">
-        <Box>
-          <Title order={2}>Connect Bank Dhofar</Title>
-          <Text size="sm" c="dimmed" mt={4}>ربط حساب بنك ظفار</Text>
-        </Box>
+        <Title order={2}>Connect Bank Dhofar</Title>
 
         {error && (
           <Alert icon={<IconAlertCircle size={18} />} color="red" title="Connection Error" variant="light">
@@ -125,7 +122,6 @@ export default function ConnectBank() {
                 <Text fw={700} size="xl">Bank Dhofar</Text>
                 <Badge color="green" size="sm" variant="filled">Supported</Badge>
               </Group>
-              <Text size="sm" c="dimmed">بنك ظفار</Text>
               <Text size="xs" c="dimmed" mt={2}>Secure connection via Open Banking APIs</Text>
             </Box>
           </Group>
@@ -138,10 +134,7 @@ export default function ConnectBank() {
                   <ThemeIcon size={28} radius="xl" color="violet" variant="light">
                     <perm.icon size={14} />
                   </ThemeIcon>
-                  <Box>
-                    <Text size="sm">{perm.label}</Text>
-                    <Text size="xs" c="dimmed">{perm.labelAr}</Text>
-                  </Box>
+                  <Text size="sm">{perm.label}</Text>
                 </Group>
               ))}
             </Stack>
@@ -175,8 +168,6 @@ export default function ConnectBank() {
             </Button>
             <Text size="xs" c="dimmed" ta="center">
               You will be redirected to Bank Dhofar Online to approve the connection.
-              <br />
-              سيتم إعادة توجيهك إلى بنك ظفار عبر الإنترنت للموافقة على الاتصال.
             </Text>
           </Stack>
         </Card>

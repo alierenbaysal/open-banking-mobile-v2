@@ -283,9 +283,6 @@ export default function Transfer() {
             <Title order={2} c="white" ta="center">
               Transfer Successful
             </Title>
-            <Text size="sm" c="rgba(255,255,255,0.8)" ta="center">
-              {'تم التحويل بنجاح'}
-            </Text>
           </Stack>
         </Card>
 
@@ -293,7 +290,7 @@ export default function Transfer() {
           <Stack gap="md">
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                Reference / المرجع
+                Reference
               </Text>
               <Text size="sm" fw={600} ff="monospace">
                 {success.id}
@@ -302,7 +299,7 @@ export default function Transfer() {
             <Divider />
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                Amount / المبلغ
+                Amount
               </Text>
               <Text size="lg" fw={700} c="#4D9134">
                 {formatBalance(success.amount)}
@@ -311,7 +308,7 @@ export default function Transfer() {
             <Divider />
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                From / من
+                From
               </Text>
               <Box ta="right">
                 <Text size="sm" fw={500}>
@@ -325,7 +322,7 @@ export default function Transfer() {
             <Divider />
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                To / إلى
+                To
               </Text>
               <Box ta="right">
                 <Text size="sm" fw={500}>
@@ -339,7 +336,7 @@ export default function Transfer() {
             <Divider />
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                Payment Reference / مرجع الدفع
+                Payment Reference
               </Text>
               <Text size="sm" fw={500}>
                 {success.reference}
@@ -348,7 +345,7 @@ export default function Transfer() {
             <Divider />
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                Date / التاريخ
+                Date
               </Text>
               <Text size="sm" fw={500}>
                 {new Date(success.timestamp).toLocaleString('en-GB', {
@@ -372,7 +369,7 @@ export default function Transfer() {
             onClick={handleNewTransfer}
             style={{ backgroundColor: '#4D9134' }}
           >
-            New Transfer / تحويل جديد
+            New Transfer
           </Button>
           <Button
             variant="light"
@@ -381,7 +378,7 @@ export default function Transfer() {
             leftSection={<IconBuildingBank size={18} />}
             onClick={() => navigate('/dashboard')}
           >
-            Dashboard / لوحة التحكم
+            Dashboard
           </Button>
         </Group>
       </Stack>
@@ -404,9 +401,6 @@ export default function Transfer() {
           <Title order={3} c="white" ta="center">
             Transfer Funds
           </Title>
-          <Text size="sm" c="rgba(255,255,255,0.8)" ta="center">
-            {'تحويل الأموال'}
-          </Text>
         </Stack>
       </Card>
 
@@ -414,7 +408,7 @@ export default function Transfer() {
       <Card withBorder radius="md" padding="md">
         <Stack gap="md">
           <Group justify="space-between">
-            <Text fw={600}>Transfer Type / نوع التحويل</Text>
+            <Text fw={600}>Transfer Type</Text>
             <Anchor
               size="sm"
               c="#4D9134"
@@ -426,7 +420,7 @@ export default function Transfer() {
             >
               <Group gap={4}>
                 <IconUserPlus size={14} />
-                Manage Beneficiaries / إدارة المستفيدين
+                Manage Beneficiaries
               </Group>
             </Anchor>
           </Group>
@@ -442,17 +436,17 @@ export default function Transfer() {
             <Stack gap="xs">
               <Radio
                 value="own"
-                label="Between My Accounts / بين حساباتي"
+                label="Between My Accounts"
                 color="green"
               />
               <Radio
                 value="beneficiary"
-                label="To a Beneficiary / إلى مستفيد"
+                label="To a Beneficiary"
                 color="green"
               />
               <Radio
                 value="external"
-                label="To Another IBAN / إلى حساب آخر"
+                label="To Another IBAN"
                 color="green"
               />
             </Stack>
@@ -463,9 +457,9 @@ export default function Transfer() {
       {/* From account */}
       <Card withBorder radius="md" padding="md">
         <Stack gap="md">
-          <Text fw={600}>From Account / من حساب</Text>
+          <Text fw={600}>From Account</Text>
           <Select
-            placeholder="Select source account / اختر حساب المصدر"
+            placeholder="Select source account"
             data={fromAccountOptions}
             value={fromAccountId}
             onChange={setFromAccountId}
@@ -475,7 +469,7 @@ export default function Transfer() {
             <Paper p="sm" radius="md" style={{ backgroundColor: '#f0f9ed' }}>
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">
-                  Available Balance / الرصيد المتاح
+                  Available Balance
                 </Text>
                 <Text size="md" fw={700} c="#4D9134">
                   {formatBalance(fromAccount.balance)}
@@ -491,14 +485,14 @@ export default function Transfer() {
         <Stack gap="md">
           <Text fw={600}>
             {transferMode === 'own'
-              ? 'To Account / إلى حساب'
+              ? 'To Account'
               : transferMode === 'beneficiary'
-                ? 'Select Beneficiary / اختر المستفيد'
-                : 'Beneficiary IBAN / رقم الآيبان'}
+                ? 'Select Beneficiary'
+                : 'Beneficiary IBAN'}
           </Text>
           {transferMode === 'own' ? (
             <Select
-              placeholder="Select destination account / اختر حساب الوجهة"
+              placeholder="Select destination account"
               data={toAccountOptions}
               value={toAccountId}
               onChange={setToAccountId}
@@ -512,7 +506,7 @@ export default function Transfer() {
                   <Loader color="green" size="sm" />
                 </Center>
               ) : beneficiaries.length === 0 ? (
-                <Alert color="gray" title="No Beneficiaries / لا يوجد مستفيدون">
+                <Alert color="gray" title="No Beneficiaries">
                   <Text size="sm">
                     You have no saved beneficiaries.{' '}
                     <Anchor
@@ -523,7 +517,7 @@ export default function Transfer() {
                         navigate('/beneficiaries');
                       }}
                     >
-                      Add a beneficiary / أضف مستفيدا
+                      Add a beneficiary
                     </Anchor>
                   </Text>
                 </Alert>
@@ -559,11 +553,6 @@ export default function Transfer() {
                                 </Badge>
                               )}
                             </Group>
-                            {ben.name_ar && (
-                              <Text size="xs" c="dimmed" dir="rtl">
-                                {ben.name_ar}
-                              </Text>
-                            )}
                             <Text size="xs" ff="monospace" c="dimmed">
                               {maskIban(ben.iban)}
                             </Text>
@@ -602,7 +591,7 @@ export default function Transfer() {
       <Card withBorder radius="md" padding="md">
         <Stack gap="md">
           <NumberInput
-            label="Amount / المبلغ"
+            label="Amount"
             placeholder="0.000"
             value={amount}
             onChange={setAmount}
@@ -615,12 +604,12 @@ export default function Transfer() {
             leftSectionWidth={50}
             error={
               parsedAmount > 0 && fromAccount && parsedAmount > fromAccount.balance
-                ? 'Insufficient balance / رصيد غير كاف'
+                ? 'Insufficient balance'
                 : undefined
             }
           />
           <TextInput
-            label="Reference / المرجع"
+            label="Reference"
             placeholder="Payment reference or description"
             value={reference}
             onChange={(e) => setReference(e.currentTarget.value)}
@@ -636,7 +625,7 @@ export default function Transfer() {
             <Group gap="xs">
               <IconReceipt size={18} color="#4D9134" />
               <Text size="sm" fw={600} c="#4D9134">
-                Transfer Summary / ملخص التحويل
+                Transfer Summary
               </Text>
             </Group>
             <Divider />
@@ -686,7 +675,7 @@ export default function Transfer() {
         disabled={!canSubmit}
         style={{ backgroundColor: '#4D9134' }}
       >
-        Confirm Transfer / تأكيد التحويل
+        Confirm Transfer
       </Button>
 
       <Text size="xs" c="dimmed" ta="center">

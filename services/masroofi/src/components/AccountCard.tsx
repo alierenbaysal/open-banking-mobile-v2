@@ -87,7 +87,7 @@ export default function AccountCard({ account, balance, onClick }: AccountCardPr
         </Group>
 
         <Box>
-          <Text size="xs" c="dimmed" mb={4}>Available Balance / الرصيد المتاح</Text>
+          <Text size="xs" c="dimmed" mb={4}>Available Balance</Text>
           <Text
             size="xl"
             fw={700}

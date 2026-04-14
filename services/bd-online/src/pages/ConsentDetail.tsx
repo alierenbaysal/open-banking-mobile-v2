@@ -264,7 +264,7 @@ export default function ConsentDetail() {
       {/* Key dates */}
       <Card withBorder radius="md" padding="md">
         <Text fw={600} mb="sm">
-          Timeline / الجدول الزمني
+          Timeline
         </Text>
         <Stack gap="xs">
           <Group justify="space-between">
@@ -335,7 +335,7 @@ export default function ConsentDetail() {
       {/* Permissions */}
       <Card withBorder radius="md" padding="md">
         <Text fw={600} mb="md">
-          Permissions / الصلاحيات
+          Permissions
         </Text>
         <PermissionDisplay permissions={consent.permissions} />
       </Card>
@@ -344,7 +344,7 @@ export default function ConsentDetail() {
       {consent.selected_accounts && consent.selected_accounts.length > 0 && (
         <Card withBorder radius="md" padding="md">
           <Text fw={600} mb="md">
-            Shared Accounts / الحسابات المشتركة
+            Shared Accounts
           </Text>
           <Stack gap="sm">
             {consent.selected_accounts.map((accountId) => {
@@ -372,7 +372,7 @@ export default function ConsentDetail() {
           <Group gap="xs" mb="md">
             <IconHistory size={18} color="var(--mantine-color-gray-6)" />
             <Text fw={600}>
-              Audit History / سجل المراجعة
+              Audit History
             </Text>
           </Group>
           <Timeline active={history.length - 1} bulletSize={24} lineWidth={2}>
@@ -452,10 +452,6 @@ export default function ConsentDetail() {
               This action cannot be undone.
             </Text>
           </Alert>
-
-          <Text size="sm" c="dimmed">
-            {'إلغاء هذه الموافقة سيوقف وصول الطرف الخارجي إلى بيانات حسابك فورًا.'}
-          </Text>
 
           <Textarea
             label="Reason (optional)"

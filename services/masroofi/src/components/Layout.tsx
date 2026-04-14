@@ -29,10 +29,10 @@ import { getCurrentUser, logout } from '@/utils/auth';
 import { isBankConnected, disconnectBank } from '@/utils/consent';
 
 const NAV_ITEMS = [
-  { path: '/dashboard', label: 'Dashboard', labelAr: 'لوحة المعلومات', icon: IconDashboard },
-  { path: '/accounts', label: 'Accounts', labelAr: 'الحسابات', icon: IconCreditCard },
-  { path: '/transactions', label: 'Transactions', labelAr: 'المعاملات', icon: IconReceipt },
-  { path: '/spending', label: 'Spending', labelAr: 'المصروفات', icon: IconChartPie },
+  { path: '/dashboard', label: 'Dashboard', icon: IconDashboard },
+  { path: '/accounts', label: 'Accounts', icon: IconCreditCard },
+  { path: '/transactions', label: 'Transactions', icon: IconReceipt },
+  { path: '/spending', label: 'Spending', icon: IconChartPie },
 ];
 
 export default function Layout() {
@@ -134,12 +134,7 @@ export default function Layout() {
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.path}
-              label={
-                <Group gap={6}>
-                  <Text size="sm">{item.label}</Text>
-                  <Text size="xs" c="dimmed">{item.labelAr}</Text>
-                </Group>
-              }
+              label={item.label}
               leftSection={<item.icon size={20} stroke={1.5} />}
               active={location.pathname === item.path || location.pathname.startsWith(item.path + '/')}
               onClick={() => {
@@ -156,12 +151,7 @@ export default function Layout() {
 
           {!connected && (
             <NavLink
-              label={
-                <Group gap={6}>
-                  <Text size="sm" fw={500}>Connect Bank</Text>
-                  <Text size="xs" c="dimmed">ربط الحساب البنكي</Text>
-                </Group>
-              }
+              label="Connect Bank"
               leftSection={<IconBuildingBank size={20} stroke={1.5} />}
               active={location.pathname === '/connect'}
               onClick={() => {

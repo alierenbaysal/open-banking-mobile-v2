@@ -51,9 +51,6 @@ export default function AccountPicker({
         <Text size="sm">
           Select at least {minSelect} account{minSelect > 1 ? 's' : ''} to share with this service provider.
         </Text>
-        <Text size="xs" c="dimmed" mt={2}>
-          اختر حسابًا واحدًا على الأقل للمشاركة مع مزود الخدمة.
-        </Text>
       </Alert>
 
       {accounts.map((account) => {

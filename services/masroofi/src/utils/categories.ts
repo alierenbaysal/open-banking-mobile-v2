@@ -6,7 +6,6 @@
 export interface Category {
   id: string;
   name: string;
-  nameAr: string;
   color: string;
   icon: string;
   patterns: RegExp[];
@@ -16,7 +15,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'salary',
     name: 'Salary & Income',
-    nameAr: 'الراتب والدخل',
     color: '#00b894',
     icon: 'cash',
     patterns: [/salary/i, /payroll/i, /wage/i, /income/i, /bonus/i, /commission/i],
@@ -24,7 +22,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'groceries',
     name: 'Groceries',
-    nameAr: 'البقالة',
     color: '#fdcb6e',
     icon: 'shopping-cart',
     patterns: [
@@ -35,7 +32,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'telecom',
     name: 'Telecom',
-    nameAr: 'الاتصالات',
     color: '#0984e3',
     icon: 'device-mobile',
     patterns: [/omantel/i, /ooredoo/i, /awasr/i, /telecom/i, /internet/i, /mobile/i, /recharge/i],
@@ -43,7 +39,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'transport',
     name: 'Transport & Fuel',
-    nameAr: 'النقل والوقود',
     color: '#636e72',
     icon: 'car',
     patterns: [
@@ -54,7 +49,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'dining',
     name: 'Dining & Food',
-    nameAr: 'المطاعم والطعام',
     color: '#e17055',
     icon: 'tools-kitchen-2',
     patterns: [
@@ -66,7 +60,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'coffee',
     name: 'Coffee & Cafe',
-    nameAr: 'القهوة',
     color: '#e77f67',
     icon: 'coffee',
     patterns: [
@@ -77,7 +70,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'shopping',
     name: 'Shopping',
-    nameAr: 'التسوق',
     color: '#a29bfe',
     icon: 'shopping-bag',
     patterns: [
@@ -89,7 +81,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'online',
     name: 'Online Shopping',
-    nameAr: 'التسوق الإلكتروني',
     color: '#6c5ce7',
     icon: 'world',
     patterns: [
@@ -100,7 +91,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'utilities',
     name: 'Utilities',
-    nameAr: 'المرافق',
     color: '#00cec9',
     icon: 'bolt',
     patterns: [
@@ -111,7 +101,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'housing',
     name: 'Housing & Rent',
-    nameAr: 'السكن والإيجار',
     color: '#55a3e8',
     icon: 'home',
     patterns: [
@@ -122,7 +111,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'transfers',
     name: 'Transfers',
-    nameAr: 'التحويلات',
     color: '#74b9ff',
     icon: 'arrows-exchange',
     patterns: [/transfer/i, /remittance/i, /swift/i, /wire/i, /send money/i],
@@ -130,7 +118,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'healthcare',
     name: 'Healthcare',
-    nameAr: 'الرعاية الصحية',
     color: '#ff7675',
     icon: 'heart',
     patterns: [
@@ -141,7 +128,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'insurance',
     name: 'Insurance',
-    nameAr: 'التأمين',
     color: '#636e72',
     icon: 'shield',
     patterns: [/insurance/i, /policy/i, /premium/i, /takaful/i, /dhofar.?ins/i],
@@ -149,7 +135,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'education',
     name: 'Education',
-    nameAr: 'التعليم',
     color: '#fab1a0',
     icon: 'school',
     patterns: [/school/i, /university/i, /college/i, /tuition/i, /education/i, /training/i],
@@ -157,7 +142,6 @@ export const CATEGORIES: Category[] = [
   {
     id: 'other',
     name: 'Other',
-    nameAr: 'أخرى',
     color: '#b2bec3',
     icon: 'dots',
     patterns: [],

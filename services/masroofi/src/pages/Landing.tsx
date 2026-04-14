@@ -33,28 +33,24 @@ const FEATURES = [
   {
     icon: IconChartPie,
     title: 'Spending Insights',
-    titleAr: 'تحليل المصاريف',
     description: 'See where your money goes with automatic transaction categorization and beautiful breakdowns.',
     color: '#6C5CE7',
   },
   {
     icon: IconCreditCard,
     title: 'Multi-Account View',
-    titleAr: 'عرض جميع الحسابات',
     description: 'View all your Bank Dhofar accounts in one place with real-time balances.',
     color: '#00b894',
   },
   {
     icon: IconSearch,
     title: 'Transaction Search',
-    titleAr: 'البحث في المعاملات',
     description: 'Find any transaction instantly with powerful filters by date, amount, and category.',
     color: '#0984e3',
   },
   {
     icon: IconShieldCheck,
     title: 'Bank-Grade Security',
-    titleAr: 'أمان بمستوى البنوك',
     description: 'Your data stays at the bank. We use Open Banking APIs with your explicit consent.',
     color: '#e17055',
   },
@@ -155,23 +151,11 @@ export default function Landing() {
         <Container size="lg" style={{ position: 'relative', zIndex: 1 }}>
           <Stack align="center" gap="xl">
             <Box ta="center">
-              <Text
-                size="lg"
-                fw={600}
-                c="rgba(255,255,255,0.85)"
-                mb="xs"
-                style={{ fontFamily: 'serif', letterSpacing: 1 }}
-              >
-                مصروفي
-              </Text>
               <Title order={1} c="white" size={48} ta="center" style={{ lineHeight: 1.2 }}>
                 Track Your Spending,
                 <br />
                 Manage Your Money
               </Title>
-              <Text size="xl" c="rgba(255,255,255,0.85)" ta="center" mt="md" maw={600} mx="auto">
-                تتبع مصاريفك، أدر أموالك
-              </Text>
               <Text size="md" c="rgba(255,255,255,0.7)" ta="center" mt="sm" maw={500} mx="auto">
                 Connect your Bank Dhofar account and get instant insights into your finances
                 with Oman's first Open Banking personal finance app.
@@ -242,7 +226,6 @@ export default function Landing() {
                 <feature.icon size={28} color={feature.color} />
               </ThemeIcon>
               <Text fw={600} size="lg" mt="md">{feature.title}</Text>
-              <Text size="sm" c="violet.4" mt={2}>{feature.titleAr}</Text>
               <Text size="sm" c="dimmed" mt="sm">{feature.description}</Text>
             </Card>
           ))}

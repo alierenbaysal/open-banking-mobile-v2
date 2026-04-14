@@ -142,10 +142,7 @@ export default function Checkout() {
           <Stack gap="xs">
             <Group justify="space-between">
               <Text size="sm" c="dimmed">Merchant</Text>
-              <Group gap={8}>
-                <Text size="sm" fw={500}>{MERCHANT.name}</Text>
-                <Text size="sm" c="dimmed" dir="rtl">{MERCHANT.nameAr}</Text>
-              </Group>
+              <Text size="sm" fw={500}>{MERCHANT.name}</Text>
             </Group>
             <Group justify="space-between">
               <Text size="sm" c="dimmed">IBAN</Text>

@@ -1,5 +1,5 @@
 /**
- * PermissionDisplay — renders OBIE permissions in human-readable English + Arabic.
+ * PermissionDisplay — renders OBIE permissions in human-readable English.
  */
 
 import { Box, Group, Text, ThemeIcon, Stack, Paper } from '@mantine/core';
@@ -16,7 +16,6 @@ import {
 
 interface PermissionInfo {
   label: string;
-  labelAr: string;
   description: string;
   icon: typeof IconEye;
   color: string;
@@ -30,7 +29,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   // Account Information
   ReadAccountsBasic: {
     label: 'View Account Names',
-    labelAr: 'عرض أسماء الحسابات',
     description: 'See your account names and types',
     icon: IconBuildingBank,
     color: 'blue',
@@ -38,7 +36,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadAccountsDetail: {
     label: 'View Account Details',
-    labelAr: 'عرض تفاصيل الحسابات',
     description: 'See your account numbers, sort codes, and IBANs',
     icon: IconBuildingBank,
     color: 'blue',
@@ -46,7 +43,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadBalances: {
     label: 'View Balances',
-    labelAr: 'عرض الأرصدة',
     description: 'See your current account balances',
     icon: IconCreditCard,
     color: 'green',
@@ -54,7 +50,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadTransactionsBasic: {
     label: 'View Transaction History',
-    labelAr: 'عرض سجل المعاملات',
     description: 'See your transaction amounts and dates',
     icon: IconReceipt,
     color: 'orange',
@@ -62,7 +57,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadTransactionsDetail: {
     label: 'View Transaction Details',
-    labelAr: 'عرض تفاصيل المعاملات',
     description: 'See full transaction details including merchant names',
     icon: IconReceipt,
     color: 'orange',
@@ -70,7 +64,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadTransactionsCredits: {
     label: 'View Credit Transactions',
-    labelAr: 'عرض المعاملات الدائنة',
     description: 'See incoming payments and credits',
     icon: IconReceipt,
     color: 'teal',
@@ -78,7 +71,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadTransactionsDebits: {
     label: 'View Debit Transactions',
-    labelAr: 'عرض المعاملات المدينة',
     description: 'See outgoing payments and debits',
     icon: IconReceipt,
     color: 'red',
@@ -86,7 +78,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadBeneficiariesBasic: {
     label: 'View Saved Payees',
-    labelAr: 'عرض المستفيدين',
     description: 'See your saved payee names',
     icon: IconUsers,
     color: 'grape',
@@ -94,7 +85,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadBeneficiariesDetail: {
     label: 'View Payee Details',
-    labelAr: 'عرض تفاصيل المستفيدين',
     description: 'See your saved payee account details',
     icon: IconUsers,
     color: 'grape',
@@ -102,7 +92,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadDirectDebits: {
     label: 'View Direct Debits',
-    labelAr: 'عرض الخصم المباشر',
     description: 'See your direct debit mandates',
     icon: IconFileText,
     color: 'cyan',
@@ -110,7 +99,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadStandingOrdersBasic: {
     label: 'View Standing Orders',
-    labelAr: 'عرض الأوامر الدائمة',
     description: 'See your standing order amounts and schedules',
     icon: IconCalendar,
     color: 'indigo',
@@ -118,7 +106,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadStandingOrdersDetail: {
     label: 'View Standing Order Details',
-    labelAr: 'عرض تفاصيل الأوامر الدائمة',
     description: 'See full standing order details including payee info',
     icon: IconCalendar,
     color: 'indigo',
@@ -126,7 +113,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadProducts: {
     label: 'View Product Information',
-    labelAr: 'عرض معلومات المنتج',
     description: 'See your account product details and features',
     icon: IconShieldCheck,
     color: 'lime',
@@ -134,7 +120,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadOffers: {
     label: 'View Account Offers',
-    labelAr: 'عرض عروض الحساب',
     description: 'See available offers on your accounts',
     icon: IconShieldCheck,
     color: 'yellow',
@@ -142,7 +127,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadParty: {
     label: 'View Personal Information',
-    labelAr: 'عرض المعلومات الشخصية',
     description: 'See your name, address, and contact details',
     icon: IconUsers,
     color: 'pink',
@@ -150,7 +134,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadPartyPSU: {
     label: 'View Identity Details',
-    labelAr: 'عرض تفاصيل الهوية',
     description: 'See your identity verification details',
     icon: IconUsers,
     color: 'pink',
@@ -158,7 +141,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadScheduledPaymentsBasic: {
     label: 'View Scheduled Payments',
-    labelAr: 'عرض المدفوعات المجدولة',
     description: 'See your upcoming scheduled payments',
     icon: IconCalendar,
     color: 'violet',
@@ -166,7 +148,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadScheduledPaymentsDetail: {
     label: 'View Scheduled Payment Details',
-    labelAr: 'عرض تفاصيل المدفوعات المجدولة',
     description: 'See full details of scheduled payments',
     icon: IconCalendar,
     color: 'violet',
@@ -174,7 +155,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadStatementsBasic: {
     label: 'View Statement Summaries',
-    labelAr: 'عرض ملخص كشف الحساب',
     description: 'See your statement dates and totals',
     icon: IconFileText,
     color: 'gray',
@@ -182,7 +162,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadStatementsDetail: {
     label: 'View Full Statements',
-    labelAr: 'عرض كشف الحساب الكامل',
     description: 'See your complete bank statements',
     icon: IconFileText,
     color: 'gray',
@@ -190,7 +169,6 @@ const PERMISSION_MAP: Record<string, PermissionInfo> = {
   },
   ReadPAN: {
     label: 'View Card Numbers',
-    labelAr: 'عرض أرقام البطاقات',
     description: 'See your full card numbers (PAN)',
     icon: IconCreditCard,
     color: 'red',
@@ -263,14 +241,9 @@ export default function PermissionDisplay({ permissions, compact = false }: Perm
                     <info.icon size={16} />
                   </ThemeIcon>
                   <Box style={{ flex: 1 }}>
-                    <Group gap="xs" align="baseline">
-                      <Text size="sm" fw={500}>
-                        {info.label}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {info.labelAr}
-                      </Text>
-                    </Group>
+                    <Text size="sm" fw={500}>
+                      {info.label}
+                    </Text>
                     <Text size="xs" c="dimmed">
                       {info.description}
                     </Text>

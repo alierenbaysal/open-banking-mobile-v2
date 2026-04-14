@@ -16,71 +16,47 @@ import { getPermissionSummary } from './PermissionDisplay';
 
 const STATUS_CONFIG: Record<
   ConsentStatus,
-  { label: string; labelAr: string; color: string; icon: typeof IconCheck }
+  { label: string; color: string; icon: typeof IconCheck }
 > = {
   AwaitingAuthorisation: {
     label: 'Pending',
-    labelAr: 'قيد الانتظار',
     color: 'yellow',
     icon: IconClock,
   },
   Authorised: {
     label: 'Active',
-    labelAr: 'نشط',
     color: 'green',
     icon: IconShieldCheck,
   },
   Rejected: {
     label: 'Rejected',
-    labelAr: 'مرفوض',
     color: 'red',
     icon: IconX,
   },
   Consumed: {
     label: 'Consumed',
-    labelAr: 'مستخدم',
     color: 'gray',
     icon: IconCheck,
   },
   Revoked: {
     label: 'Revoked',
-    labelAr: 'ملغى',
     color: 'orange',
     icon: IconShieldOff,
   },
   Expired: {
     label: 'Expired',
-    labelAr: 'منتهي',
     color: 'gray',
     icon: IconBan,
   },
 };
 
-const CONSENT_TYPE_LABELS: Record<string, { en: string; ar: string }> = {
-  'account-access': {
-    en: 'Account Information',
-    ar: 'معلومات الحساب',
-  },
-  'domestic-payment': {
-    en: 'Payment',
-    ar: 'دفع',
-  },
-  'scheduled-payment': {
-    en: 'Scheduled Payment',
-    ar: 'دفع مجدول',
-  },
-  'standing-order': {
-    en: 'Standing Order',
-    ar: 'أمر دائم',
-  },
-  'domestic-vrp': {
-    en: 'Variable Recurring Payment',
-    ar: 'دفع متكرر متغير',
-  },
-  'funds-confirmation': {
-    en: 'Funds Confirmation',
-    ar: 'تأكيد الأموال',
-  },
+const CONSENT_TYPE_LABELS: Record<string, { en: string }> = {
+  'account-access': { en: 'Account Information' },
+  'domestic-payment': { en: 'Payment' },
+  'scheduled-payment': { en: 'Scheduled Payment' },
+  'standing-order': { en: 'Standing Order' },
+  'domestic-vrp': { en: 'Variable Recurring Payment' },
+  'funds-confirmation': { en: 'Funds Confirmation' },
 };
 
 interface ConsentCardProps {
@@ -93,7 +69,6 @@ export default function ConsentCard({ consent, tppName, onClick }: ConsentCardPr
   const statusConfig = STATUS_CONFIG[consent.status] || STATUS_CONFIG.AwaitingAuthorisation;
   const typeLabels = CONSENT_TYPE_LABELS[consent.consent_type] || {
     en: consent.consent_type,
-    ar: '',
   };
   const StatusIcon = statusConfig.icon;
 
@@ -164,7 +139,7 @@ export default function ConsentCard({ consent, tppName, onClick }: ConsentCardPr
         }}
       >
         <Text size="xs" c="dimmed" mb={2}>
-          Permissions / الصلاحيات
+          Permissions
         </Text>
         <Text size="xs" lineClamp={1}>
           {getPermissionSummary(consent.permissions || [])}

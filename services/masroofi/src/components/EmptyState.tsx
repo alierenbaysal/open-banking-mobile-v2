@@ -20,7 +20,6 @@ export default function EmptyState({ type = 'no-bank', title, description, actio
       icon: IconBuildingBank,
       color: 'violet',
       title: 'Connect Your Bank to Get Started',
-      titleAr: 'اربط حسابك البنكي للبدء',
       description: 'Link your Bank Dhofar account to view your financial data, track spending, and get insights.',
       action: { label: 'Connect Bank Dhofar', onClick: () => navigate('/connect') },
     },
@@ -28,7 +27,6 @@ export default function EmptyState({ type = 'no-bank', title, description, actio
       icon: IconMoodSad,
       color: 'gray',
       title: 'No Data Available',
-      titleAr: 'لا توجد بيانات',
       description: 'There is no data to display at the moment. Try refreshing or check back later.',
       action: undefined,
     },
@@ -36,7 +34,6 @@ export default function EmptyState({ type = 'no-bank', title, description, actio
       icon: IconMoodSad,
       color: 'red',
       title: 'Something Went Wrong',
-      titleAr: 'حدث خطأ',
       description: 'We encountered an error loading your data. Please try again.',
       action: undefined,
     },
@@ -52,10 +49,7 @@ export default function EmptyState({ type = 'no-bank', title, description, actio
         <ThemeIcon size={80} radius="xl" color={config.color} variant="light">
           <Icon size={40} />
         </ThemeIcon>
-        <Stack gap={4} align="center">
-          <Text fw={700} size="xl" ta="center">{title || config.title}</Text>
-          <Text size="sm" c="dimmed" ta="center">{config.titleAr}</Text>
-        </Stack>
+        <Text fw={700} size="xl" ta="center">{title || config.title}</Text>
         <Text size="sm" c="dimmed" ta="center" maw={500}>
           {description || config.description}
         </Text>

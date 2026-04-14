@@ -134,17 +134,12 @@ export default function Login() {
                 <IconBuildingBank size={36} color="white" />
               </Box>
 
-              <Stack align="center" gap={4}>
-                <Text size="xl" fw={700} c="dark">
-                  Bank Dhofar
-                </Text>
-                <Text size="md" c="dimmed">
-                  {'بنك ظفار'}
-                </Text>
-              </Stack>
+              <Text size="xl" fw={700} c="dark">
+                Bank Dhofar
+              </Text>
 
               <Text size="sm" c="dimmed" ta="center">
-                {'تسجيل الدخول'} / Sign In
+                Sign In
               </Text>
 
               <Divider w="100%" />
@@ -162,9 +157,6 @@ export default function Login() {
                     <IconShieldCheck size={20} color="#4D9134" />
                     <Text size="sm" ta="center" c="#4D9134" fw={500}>
                       A service provider is requesting access to your account information.
-                    </Text>
-                    <Text size="xs" ta="center" c="dimmed">
-                      {'يطلب مزود خدمة الوصول إلى معلومات حسابك.'}
                     </Text>
                     <Text size="xs" c="dimmed">
                       Please sign in to review and approve.
@@ -187,7 +179,7 @@ export default function Login() {
 
               <TextInput
                 w="100%"
-                label={'البريد الإلكتروني / Email'}
+                label="Email"
                 placeholder="email@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.currentTarget.value)}
@@ -199,7 +191,7 @@ export default function Login() {
 
               <PasswordInput
                 w="100%"
-                label={'كلمة المرور / Password'}
+                label="Password"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.currentTarget.value)}
@@ -217,11 +209,11 @@ export default function Login() {
                 disabled={submitting || !email || !password}
                 style={{ backgroundColor: '#4D9134' }}
               >
-                {submitting ? 'Signing in...' : 'تسجيل الدخول / Sign In'}
+                {submitting ? 'Signing in...' : 'Sign In'}
               </Button>
 
               <Text size="xs" c="dimmed" ta="center">
-                Secured by Bank Dhofar / {'مؤمن من بنك ظفار'}
+                Secured by Bank Dhofar
               </Text>
             </Stack>
           </form>

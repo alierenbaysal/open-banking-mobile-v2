@@ -303,10 +303,7 @@ export default function Spending() {
                             <Group justify="space-between" mb={4} wrap="nowrap">
                               <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
                                 <Text size="xl" style={{ lineHeight: 1 }}>{emoji}</Text>
-                                <Box style={{ minWidth: 0 }}>
-                                  <Text size="sm" fw={600} truncate="end">{item.category.name}</Text>
-                                  <Text size="xs" c="dimmed">{item.category.nameAr}</Text>
-                                </Box>
+                                <Text size="sm" fw={600} truncate="end" style={{ minWidth: 0 }}>{item.category.name}</Text>
                               </Group>
                               <Box style={{ textAlign: 'right', flexShrink: 0 }}>
                                 <Text size="sm" fw={700} style={{ fontVariantNumeric: 'tabular-nums' }}>

@@ -57,7 +57,7 @@ export default function Accounts() {
       <Stack gap="xl">
         <Box>
           <Title order={2}>Accounts</Title>
-          <Text size="sm" c="dimmed">الحسابات - Your Bank Dhofar accounts</Text>
+          <Text size="sm" c="dimmed">Your Bank Dhofar accounts</Text>
         </Box>
 
         {accountsError && (

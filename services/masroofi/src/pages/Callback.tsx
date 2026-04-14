@@ -87,7 +87,6 @@ export default function Callback() {
                 <Text size="sm" c="dimmed" mt="xs">
                   Exchanging authorization and setting up your account...
                 </Text>
-                <Text size="xs" c="dimmed" mt={4}>جاري ربط حسابك البنكي...</Text>
               </Box>
             </Stack>
           )}
@@ -102,7 +101,6 @@ export default function Callback() {
                 <Text size="sm" c="dimmed" mt="xs">
                   Your Bank Dhofar account is now linked to Masroofi.
                 </Text>
-                <Text size="xs" c="dimmed" mt={4}>تم ربط حسابك بنجاح</Text>
               </Box>
               <Text size="xs" c="dimmed">Redirecting to dashboard...</Text>
             </Stack>

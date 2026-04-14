@@ -70,9 +70,6 @@ export default function ProductCard({ product }: ProductCardProps) {
         <Text fw={600} size="md" lineClamp={2}>
           {product.name}
         </Text>
-        <Text size="sm" c="dimmed" dir="rtl" style={{ fontFamily: 'inherit' }}>
-          {product.nameAr}
-        </Text>
         <Text size="xs" c="dimmed" lineClamp={2} mt={4}>
           {product.description}
         </Text>

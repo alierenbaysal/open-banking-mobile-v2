@@ -32,7 +32,6 @@ import { getUser, logout, getDisplayName, getEmail, type User } from '@/utils/au
 
 interface NavItem {
   label: string;
-  labelAr: string;
   icon: typeof IconHome;
   path: string;
 }
@@ -40,19 +39,16 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   {
     label: 'Dashboard',
-    labelAr: 'لوحة التحكم',
     icon: IconHome,
     path: '/dashboard',
   },
   {
     label: 'Consents',
-    labelAr: 'الموافقات',
     icon: IconShieldCheck,
     path: '/consents',
   },
   {
     label: 'Transfer',
-    labelAr: 'تحويل',
     icon: IconArrowsExchange,
     path: '/transfer',
   },
@@ -112,9 +108,6 @@ export default function Layout() {
                 <Stack gap={0}>
                   <Text size="lg" fw={700} c="white" lh={1.1}>
                     Bank Dhofar
-                  </Text>
-                  <Text size="xs" c="rgba(255,255,255,0.8)" lh={1}>
-                    بنك ظفار
                   </Text>
                 </Stack>
               </Group>
@@ -188,14 +181,9 @@ export default function Layout() {
                     size={20}
                     style={{ color: isActive ? '#4D9134' : '#868e96' }}
                   />
-                  <Box>
-                    <Text size="sm" fw={isActive ? 600 : 400}>
-                      {item.label}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {item.labelAr}
-                    </Text>
-                  </Box>
+                  <Text size="sm" fw={isActive ? 600 : 400}>
+                    {item.label}
+                  </Text>
                 </Group>
               </UnstyledButton>
             );

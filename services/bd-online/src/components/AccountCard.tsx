@@ -2,7 +2,7 @@
  * AccountCard — displays a bank account with masked IBAN, balance, and type badge.
  */
 
-import { Card, Group, Text, Badge, Stack, Box } from '@mantine/core';
+import { Card, Group, Text, Badge, Box } from '@mantine/core';
 import { IconWallet } from '@tabler/icons-react';
 import { type BankAccount, maskIban, formatBalance } from '@/utils/accounts';
 
@@ -84,14 +84,9 @@ export default function AccountCard({ account, compact = false }: AccountCardPro
           >
             <IconWallet size={22} color={`var(--mantine-color-${color}-6)`} />
           </Box>
-          <Stack gap={2}>
-            <Text fw={600} size="sm">
-              {account.description}
-            </Text>
-            <Text size="xs" c="dimmed">
-              {account.descriptionAr}
-            </Text>
-          </Stack>
+          <Text fw={600} size="sm">
+            {account.description}
+          </Text>
         </Group>
         <Badge color={color} variant="light" size="sm">
           {typeLabel}
@@ -112,7 +107,7 @@ export default function AccountCard({ account, compact = false }: AccountCardPro
           {maskIban(account.iban)}
         </Text>
         <Text size="xs" c="dimmed" mb={4}>
-          Available Balance / الرصيد المتاح
+          Available Balance
         </Text>
         <Text size="xl" fw={700} c="dark">
           {formatBalance(account.balance, account.currency)}

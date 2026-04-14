@@ -80,9 +80,6 @@ export default function Dashboard() {
   const displayName = user ? getDisplayName(user) : 'Customer';
   const firstName = displayName.split(' ')[0];
 
-  // Arabic greeting based on first name
-  const arabicGreeting = 'مرحبا';
-
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
   const activeConsents = consents.filter((c) => c.status === 'Authorised').length;
   const pendingConsents = consents.filter((c) => c.status === 'AwaitingAuthorisation').length;
@@ -101,7 +98,7 @@ export default function Dashboard() {
         <Group justify="space-between" align="flex-start">
           <Box>
             <Text size="sm" c="rgba(255,255,255,0.8)">
-              {arabicGreeting} / Welcome back
+              Welcome back
             </Text>
             <Title order={2} c="white" mt={4}>
               {firstName}
@@ -112,7 +109,7 @@ export default function Dashboard() {
           </Box>
           <Box ta="right">
             <Text size="xs" c="rgba(255,255,255,0.6)">
-              Total Balance / إجمالي الرصيد
+              Total Balance
             </Text>
             <Text size="xl" fw={700} c="white" mt={4}>
               {formatBalance(totalBalance)}
@@ -130,7 +127,7 @@ export default function Dashboard() {
             </ThemeIcon>
             <Box>
               <Text size="xs" c="dimmed">
-                Accounts / الحسابات
+                Accounts
               </Text>
               <Text size="xl" fw={700}>
                 {accounts.length}
@@ -146,7 +143,7 @@ export default function Dashboard() {
             </ThemeIcon>
             <Box>
               <Text size="xs" c="dimmed">
-                Active Consents / موافقات نشطة
+                Active Consents
               </Text>
               <Text size="xl" fw={700}>
                 {activeConsents}
@@ -162,7 +159,7 @@ export default function Dashboard() {
             </ThemeIcon>
             <Box>
               <Text size="xs" c="dimmed">
-                Pending Approvals / بانتظار الموافقة
+                Pending Approvals
               </Text>
               <Group gap="xs" align="baseline">
                 <Text size="xl" fw={700}>
@@ -182,12 +179,7 @@ export default function Dashboard() {
       {/* Accounts section */}
       <Box>
         <Group justify="space-between" mb="md">
-          <Box>
-            <Title order={4}>Your Accounts</Title>
-            <Text size="sm" c="dimmed">
-              {'حساباتك'}
-            </Text>
-          </Box>
+          <Title order={4}>Your Accounts</Title>
         </Group>
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
           {accounts.map((account) => (
@@ -204,7 +196,7 @@ export default function Dashboard() {
               <IconArrowsExchange size={20} />
             </ThemeIcon>
             <Box>
-              <Text fw={600}>Quick Transfer / تحويل سريع</Text>
+              <Text fw={600}>Quick Transfer</Text>
               <Text size="sm" c="dimmed">
                 Transfer between your accounts or to another beneficiary
               </Text>
@@ -228,8 +220,7 @@ export default function Dashboard() {
           <Box>
             <Text fw={600}>Open Banking Consents</Text>
             <Text size="sm" c="dimmed">
-              Manage third-party access to your accounts /
-              {' إدارة وصول الأطراف الخارجية إلى حساباتك'}
+              Manage third-party access to your accounts
             </Text>
           </Box>
           <Button

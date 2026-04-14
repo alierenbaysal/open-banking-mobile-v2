@@ -9,23 +9,12 @@ export interface BankAccount {
   accountId: string;
   iban: string;
   description: string;
-  descriptionAr: string;
   currency: string;
   balance: number;
   type: AccountType;
-  typeAr: string;
 }
 
 export type AccountType = 'CurrentAccount' | 'SavingsAccount' | 'BusinessAccount';
-
-const ACCOUNT_TYPE_AR: Record<string, string> = {
-  CurrentAccount: 'حساب جاري',
-  'Current Account': 'حساب جاري',
-  SavingsAccount: 'حساب توفير',
-  'Savings Account': 'حساب توفير',
-  BusinessAccount: 'حساب تجاري',
-  'Business Account': 'حساب تجاري',
-};
 
 const BANKING_API = '/banking';
 
@@ -45,11 +34,9 @@ function transformAccount(raw: Record<string, unknown>): BankAccount {
     accountId: String(raw.account_id || ''),
     iban: String(raw.iban || ''),
     description: String(raw.description || ''),
-    descriptionAr: String(raw.description_ar || ''),
     currency: String(raw.currency || 'OMR'),
     balance: Number(raw.balance ?? 0),
     type,
-    typeAr: ACCOUNT_TYPE_AR[type] || ACCOUNT_TYPE_AR[rawType] || rawType,
   };
 }
 

@@ -24,7 +24,6 @@ const ORDER_REF_KEY = 'ss_order_ref';
 /** Merchant account details */
 export const MERCHANT = {
   name: 'Salalah Souq',
-  nameAr: '\u0635\u0644\u0627\u0644\u0629 \u0633\u0648\u0642',
   iban: 'OM02DHOF0001020099887701',
   accountId: 'DHOF-20001',
 };

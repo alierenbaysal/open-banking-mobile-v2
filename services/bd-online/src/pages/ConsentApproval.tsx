@@ -286,7 +286,6 @@ export default function ConsentApproval() {
   const tppNameAr = tpp?.tpp_name_ar || '';
   const typeLabels = CONSENT_TYPE_LABELS[consent.consent_type] || {
     en: consent.consent_type,
-    ar: '',
   };
   const isPayment =
     consent.consent_type === 'domestic-payment' ||
@@ -315,9 +314,6 @@ export default function ConsentApproval() {
           <Title order={3} c="white" ta="center">
             Authorize Access
           </Title>
-          <Text size="sm" c="rgba(255,255,255,0.8)" ta="center">
-            {'تفويض الوصول'}
-          </Text>
         </Stack>
       </Card>
 
@@ -385,7 +381,7 @@ export default function ConsentApproval() {
           <Stack gap="sm">
             <Group gap="xs">
               <IconCurrencyRiyal size={20} color="var(--mantine-color-orange-6)" />
-              <Text fw={600}>Payment Details / تفاصيل الدفع</Text>
+              <Text fw={600}>Payment Details</Text>
             </Group>
             <Divider />
             <Group justify="space-between">
@@ -428,8 +424,7 @@ export default function ConsentApproval() {
               Requested Permissions
             </Text>
             <Text size="xs" c="dimmed">
-              {'الصلاحيات المطلوبة'}
-              {' '}&mdash; This service will be able to:
+              This service will be able to:
             </Text>
           </Box>
           <PermissionDisplay permissions={consent.permissions} />
@@ -463,9 +458,6 @@ export default function ConsentApproval() {
             <Box>
               <Text fw={600}>
                 {isPayment ? 'Select Account to Pay From' : 'Select Accounts to Share'}
-              </Text>
-              <Text size="xs" c="dimmed">
-                {isPayment ? 'اختر الحساب للدفع منه' : 'اختر الحسابات للمشاركة'}
               </Text>
             </Box>
             <AccountPicker
@@ -548,9 +540,6 @@ export default function ConsentApproval() {
               <strong>{tppName}</strong>? You will be redirected back to the service provider.
             </Text>
           </Alert>
-          <Text size="sm" c="dimmed">
-            {'هل أنت متأكد من رفض هذا الطلب؟'}
-          </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={closeReject}>
               Cancel

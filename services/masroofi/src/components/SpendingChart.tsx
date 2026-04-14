@@ -94,10 +94,7 @@ export default function SpendingChart({ data, currency = 'OMR', compact = false 
               <Group justify="space-between" mb={6} wrap="nowrap">
                 <Group gap="xs" wrap="nowrap" style={{ flex: 1 }}>
                   <Text size="lg" style={{ lineHeight: 1 }}>{emoji}</Text>
-                  <Box style={{ minWidth: 0 }}>
-                    <Text size="sm" fw={600} truncate="end">{item.category.name}</Text>
-                    <Text size="xs" c="dimmed">{item.category.nameAr}</Text>
-                  </Box>
+                  <Text size="sm" fw={600} truncate="end" style={{ minWidth: 0 }}>{item.category.name}</Text>
                 </Group>
                 <Box style={{ textAlign: 'right', flexShrink: 0 }}>
                   <Text size="sm" fw={700}>{formatAmount(item.total, currency)}</Text>
