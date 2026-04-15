@@ -28,7 +28,7 @@ WORKDIR /workspace
 # build if package-lock.json is out of sync with package.json.
 COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --no-audit --no-fund
+    npm install --no-audit --no-fund --legacy-peer-deps
 
 # -----------------------------------------------------------------------
 # Stage 2: prepare the workspace. Copies source + dependencies together
