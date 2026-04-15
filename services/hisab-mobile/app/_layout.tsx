@@ -1,84 +1,29 @@
 /**
- * Root layout — Stack navigator with auth gating.
- *
- * Routes:
- *   (public)/* — welcome / login / signup / connect / callback — unauthenticated
- *   (auth)/*   — main tabbed app — requires a signed-in Hisab user
- *
- * When the user isn't signed in, we redirect to /welcome. Once signed in we
- * redirect to /(auth) (the dashboard).
+ * TEMPORARY DEBUG ROOT LAYOUT — SDK 54 isolation test.
+ * If this minimal layout renders on Expo Go, the "expected boolean got string"
+ * error is in the Stack/router/auth path below. Revert after diagnosis.
  */
-
-import React, { useCallback, useEffect, useState } from "react";
-import { Stack, useRouter, useSegments } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
-
-import { getCurrentUser, HisabUser } from "../utils/auth";
-import { colors } from "../utils/theme";
+import React from "react";
+import { SafeAreaView, StyleSheet, Text, View } from "react-native";
 
 export default function RootLayout() {
-  const [user, setUser] = useState<HisabUser | null | undefined>(undefined);
-  const segments = useSegments();
-  const router = useRouter();
-
-  const checkAuth = useCallback(async () => {
-    const u = await getCurrentUser();
-    setUser(u);
-  }, []);
-
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-
-  useEffect(() => {
-    if (user === undefined) return; // loading
-
-    const top = segments[0];
-    const inPublic = top === "(public)";
-    const inAuth = top === "(auth)";
-
-    if (!user && inAuth) {
-      router.replace("/welcome");
-    } else if (user && inPublic) {
-      // Allow the connect / callback screens even when authed
-      const sub = segments[1];
-      if (sub !== "connect" && sub !== "callback") {
-        router.replace("/");
-      }
-    } else if (!user && !inPublic && !inAuth) {
-      // Cold start, no explicit route yet
-      router.replace("/welcome");
-    }
-  }, [user, segments, router]);
-
-  if (user === undefined) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <StatusBar style="dark" />
-      </View>
-    );
-  }
-
   return (
-    <>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          contentStyle: { backgroundColor: colors.bg },
-          headerShown: false,
-        }}
-      />
-    </>
+    <SafeAreaView style={styles.root}>
+      <View style={styles.card}>
+        <Text style={styles.title}>Hisab · SDK 54 probe</Text>
+        <Text style={styles.body}>
+          If you can read this, Expo Go renders the app. The root layout is
+          intentionally minimal — no Stack, no router effects — to isolate the
+          "expected boolean got string" error.
+        </Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.bg,
-  },
+  root: { flex: 1, backgroundColor: "#F7F9FB", justifyContent: "center", paddingHorizontal: 20 },
+  card: { backgroundColor: "#FFFFFF", padding: 20, borderRadius: 12 },
+  title: { fontSize: 20, fontWeight: "700", marginBottom: 8, color: "#101624" },
+  body: { fontSize: 14, color: "#5B6573", lineHeight: 20 },
 });
