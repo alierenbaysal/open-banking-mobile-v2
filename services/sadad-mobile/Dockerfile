@@ -81,11 +81,11 @@ EXPOSE 8081
 # Expo Go sees come from EXPO_PACKAGER_PROXY_URL / EXPO_MANIFEST_PROXY_URL
 # set on the Deployment, not from here.
 #
-# --no-dev=false keeps HMR on; --minify=false keeps bundles readable
-# for symbolicate. --max-workers=2 caps CPU on a shared platform.
+# `expo start` options are flags, not key=value pairs. Passing the
+# default dev+HMR mode is implicit; we do NOT pass --no-dev (which
+# would disable HMR) or --no-minify (which Expo renamed out of `start`
+# in SDK 50+). --max-workers is kept at 2 to cap CPU on a shared platform.
 CMD ["npx", "--yes", "expo", "start", \
      "--lan", \
      "--port", "8081", \
-     "--no-dev", "false", \
-     "--minify", "false", \
      "--max-workers", "2"]
