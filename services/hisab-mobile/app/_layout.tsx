@@ -1,10 +1,11 @@
 /**
- * Debug root layout #2 — minimal expo-router. Just <Slot />.
- * No Stack, no auth gating. Tests whether any expo-router use works on SDK 54.
+ * Debug #3 — Stack with zero props. If this crashes, Stack itself is
+ * broken on SDK 54 for this env. If it works, then one of the original
+ * screenOptions was the bad input.
  */
 import React from "react";
-import { Slot } from "expo-router";
+import { Stack } from "expo-router";
 
 export default function RootLayout() {
-  return <Slot />;
+  return <Stack />;
 }
