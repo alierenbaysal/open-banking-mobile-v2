@@ -234,7 +234,7 @@ CREATE INDEX IF NOT EXISTS idx_auto_loans_next_pay ON auto_loans(next_payment_da
 
 CREATE TABLE IF NOT EXISTS loan_standing_orders (
     standing_order_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    loan_id               UUID NOT NULL REFERENCES auto_loans(loan_id),
+    loan_id               UUID REFERENCES auto_loans(loan_id),
     source_account_id     VARCHAR(20) NOT NULL,            -- customer's account
     destination_account_id VARCHAR(20) NOT NULL,           -- BD lending / loan-repayment collection account
     amount                NUMERIC(18,3) NOT NULL,

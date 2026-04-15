@@ -149,6 +149,23 @@ async def _maybe_load_decision(application_id: UUID) -> dict[str, Any] | None:
     return dict(row)
 
 
+def _as_list(v: Any) -> list[str] | None:
+    """JSONB columns come back as str sometimes when the codec isn't applied
+    to the connection. Normalise to a list or None."""
+    import json as _json
+    if v is None:
+        return None
+    if isinstance(v, list):
+        return v or None
+    if isinstance(v, str):
+        try:
+            parsed = _json.loads(v)
+            return parsed if isinstance(parsed, list) and parsed else None
+        except Exception:
+            return None
+    return None
+
+
 def _row_to_application(row: Any, decision: dict[str, Any] | None) -> Application:
     """Translate a DB row to the public Application schema."""
     from app.schemas.application import DecisionSummary
@@ -162,7 +179,7 @@ def _row_to_application(row: Any, decision: dict[str, Any] | None) -> Applicatio
             monthly_installment=Money.from_decimal(decision["monthly_installment"]) if decision["monthly_installment"] else None,
             total_repayable=Money.from_decimal(decision["total_repayable"]) if decision["total_repayable"] else None,
             total_interest=Money.from_decimal(decision["total_interest"]) if decision["total_interest"] else None,
-            decline_reasons=decision["decline_reasons"] if decision["decline_reasons"] else None,
+            decline_reasons=_as_list(decision["decline_reasons"]),
             decided_at=decision["decided_at"],
             valid_until=decision["valid_until"],
         )
