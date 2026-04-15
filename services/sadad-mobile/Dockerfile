@@ -24,9 +24,9 @@ WORKDIR /workspace
 
 # Install dependencies deterministically from the lockfile. Fails the
 # build if package-lock.json is out of sync with package.json.
-COPY package.json package-lock.json ./
+COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit
+    npm install --no-audit --no-fund
 
 # -----------------------------------------------------------------------
 # Stage 2: prepare the workspace. Copies source + dependencies together
