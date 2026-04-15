@@ -271,3 +271,16 @@ build-salalah-mobile:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes: [services/salalah-mobile/**/*]
+
+build-sadad-mobile:
+  <<: *build_mobile_harbor
+  script:
+    - >
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/services/sadad-mobile"
+      --dockerfile "${CI_PROJECT_DIR}/services/sadad-mobile/Dockerfile"
+      --destination "harbor.cp.bankdhofar.com/devx/expo-metro-sadad:${CI_COMMIT_SHORT_SHA}"
+      --destination "harbor.cp.bankdhofar.com/devx/expo-metro-sadad:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes: [services/sadad-mobile/**/*]

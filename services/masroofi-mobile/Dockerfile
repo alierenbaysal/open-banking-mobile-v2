@@ -60,6 +60,8 @@ FROM node:${NODE_VERSION}-slim AS runtime
 
 ENV NODE_ENV=development \
     EXPO_NO_TELEMETRY=1 \
+    EXPO_NO_TYPESCRIPT_SETUP=1 \
+    EXPO_OFFLINE=1 \
     CI=1 \
     NPM_CONFIG_CACHE=/tmp/.npm \
     HOME=/tmp
