@@ -216,10 +216,10 @@ async def disburse(*, application_id: UUID, dealer_account_id: str | None = None
                         dealer_id, event_type, resource_type, resource_id, application_id,
                         payload, target_url
                     )
-                    SELECT $1, 'loan_application.disbursed', 'loan_application', $2, $2,
-                           $3::jsonb, t.webhook_url
+                    SELECT $1::varchar, 'loan_application.disbursed', 'loan_application',
+                           $2::uuid, $2::uuid, $3::jsonb, t.webhook_url
                       FROM tpp_registry t
-                     WHERE t.tpp_id = $1 AND t.webhook_url IS NOT NULL
+                     WHERE t.tpp_id = $1::varchar AND t.webhook_url IS NOT NULL
                     """,
                     dealer_id, application_id,
                     json.dumps({
