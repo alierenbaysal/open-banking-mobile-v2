@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Sadad",
+    "slug": "sadad-mobile",
+    "scheme": "sadad",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#F57C00"
+    },
+    "ios": {
+      "bundleIdentifier": "com.bankdhofar.sadad",
+      "supportsTablet": true,
+      "associatedDomains": [
+        "applinks:sadad.tnd.bankdhofar.com"
+      ]
+    },
+    "android": {
+      "package": "com.bankdhofar.sadad",
+      "adaptiveIcon": {
+        "backgroundColor": "#F57C00"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            { "scheme": "sadad" },
+            { "scheme": "https", "host": "sadad.tnd.bankdhofar.com" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
