@@ -39,6 +39,23 @@ build-ob-consent-service:
       changes:
         - services/ob-consent-service/**/*
 
+build-ob-loan-service:
+  <<: *build_template
+  script:
+    - >
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/services/ob-loan-service"
+      --dockerfile "${CI_PROJECT_DIR}/services/ob-loan-service/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/ob-loan-service:${CI_COMMIT_SHORT_SHA}"
+      --destination "${CI_REGISTRY_IMAGE}/ob-loan-service:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-loan-service/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/auto-loan/
+      changes:
+        - services/ob-loan-service/**/*
+
 build-ob-tpp-manager:
   <<: *build_template
   script:
@@ -96,7 +113,7 @@ build-bd-online:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - services/bd-online/**/*
-    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/auto-loan/
       changes:
         - services/bd-online/**/*
 
@@ -111,9 +128,6 @@ build-masroofi:
       --destination "${CI_REGISTRY_IMAGE}/masroofi:latest"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        - services/masroofi/**/*
-    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
       changes:
         - services/masroofi/**/*
 
@@ -132,9 +146,6 @@ build-sadad:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - services/sadad/**/*
-    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
-      changes:
-        - services/sadad/**/*
 
 build-salalah-electronics:
   <<: *build_template
@@ -149,9 +160,6 @@ build-salalah-electronics:
       --cache=false
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        - services/salalah-electronics/**/*
-    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
       changes:
         - services/salalah-electronics/**/*
 
@@ -170,38 +178,22 @@ build-hisab:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - services/hisab/**/*
-    - if: $CI_COMMIT_BRANCH =~ /^feature\/wow-/
-      changes:
-        - services/hisab/**/*
 
-# ----------------------------------------------------------------------------
-# sadad-mobile (Expo) — image consumed by the Expo Metro DMZ platform
-# (infra repo, #379/#385).
-#
-# NOTE ON REGISTRY: the platform chart's conventional location is
-# harbor.cp.bankdhofar.com/devx/expo-metro-<name>, but the `devx` Harbor
-# project is not yet provisioned (admin-password rotation pending).
-# Pushing to the GitLab built-in registry works today with zero extra
-# config because Kaniko already authenticates against CI_REGISTRY via the
-# GitLab runner. Once devx exists, change both destinations here AND
-# apps.expoMetro.instances.sadad.image.repository in the TND overlay
-# in one PR — nothing else moves.
-# ----------------------------------------------------------------------------
-build-sadad-mobile:
+build-muscat-motors:
   <<: *build_template
   script:
     - >
       /kaniko/executor
-      --context "${CI_PROJECT_DIR}/services/sadad-mobile"
-      --dockerfile "${CI_PROJECT_DIR}/services/sadad-mobile/Dockerfile"
-      --destination "${CI_REGISTRY_IMAGE}/sadad-mobile:${CI_COMMIT_SHORT_SHA}"
-      --destination "${CI_REGISTRY_IMAGE}/sadad-mobile:latest"
+      --context "${CI_PROJECT_DIR}/services/muscat-motors"
+      --dockerfile "${CI_PROJECT_DIR}/services/muscat-motors/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/muscat-motors:${CI_COMMIT_SHORT_SHA}"
+      --destination "${CI_REGISTRY_IMAGE}/muscat-motors:latest"
       --build-arg "CACHE_BUST=${CI_COMMIT_SHORT_SHA}"
       --cache=false
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
-        - services/sadad-mobile/**/*
-    - if: $CI_COMMIT_BRANCH == "feature/mobile-sadad"
+        - services/muscat-motors/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/auto-loan/
       changes:
-        - services/sadad-mobile/**/*
+        - services/muscat-motors/**/*

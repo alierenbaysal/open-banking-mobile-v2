@@ -1,0 +1,85 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: muscat-motors
+  namespace: ob-tnd
+  labels:
+    app: muscat-motors
+    app.kubernetes.io/part-of: qantara
+    app.kubernetes.io/component: dealer-portal
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app: muscat-motors
+  template:
+    metadata:
+      labels:
+        app: muscat-motors
+        app.kubernetes.io/part-of: qantara
+    spec:
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: muscat-motors
+          image: registry.bankdhofar.com/ea/open-banking/muscat-motors:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: muscat-motors
+  namespace: ob-tnd
+  labels:
+    app: muscat-motors
+spec:
+  type: ClusterIP
+  selector:
+    app: muscat-motors
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: muscat-motors
+  namespace: ob-tnd
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: muscatmotors.tnd.bankdhofar.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: muscat-motors
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - muscatmotors.tnd.bankdhofar.com
+      secretName: tls-tnd-bankdhofar-com

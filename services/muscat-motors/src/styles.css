@@ -1,0 +1,67 @@
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  background: #0f0f11;
+  min-height: 100vh;
+  color: #e4e4e7;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up {
+  animation: fadeUp 400ms ease-out both;
+}
+
+@keyframes pulseGold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.6); }
+  50%      { box-shadow: 0 0 0 6px rgba(255, 193, 7, 0); }
+}
+
+.pulse-gold {
+  animation: pulseGold 1.4s ease-in-out infinite;
+}
+
+.car-card {
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  border: 1px solid #27272a;
+}
+
+.car-card:hover {
+  transform: translateY(-4px);
+  border-color: #ffc107;
+  box-shadow: 0 12px 40px -12px rgba(255, 193, 7, 0.25);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(90deg, #ffd54a 0%, #ffc107 50%, #c9961d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffc107;
+  display: inline-block;
+}
+
+/* Mantine tweaks for dark + gold */
+.mantine-Stepper-stepIcon[data-completed] {
+  background: #ffc107 !important;
+  border-color: #ffc107 !important;
+  color: #18181b !important;
+}
+
+.mantine-Stepper-stepIcon[data-progress] {
+  border-color: #ffc107 !important;
+  color: #ffc107 !important;
+}
+
+.mantine-Stepper-separator[data-active] {
+  background: #ffc107 !important;
+}

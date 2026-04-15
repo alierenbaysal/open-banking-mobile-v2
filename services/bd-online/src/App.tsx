@@ -23,6 +23,8 @@ import ConsentApproval from '@/pages/ConsentApproval';
 import ConsentList from '@/pages/ConsentList';
 import ConsentDetail from '@/pages/ConsentDetail';
 import Transfer from '@/pages/Transfer';
+import LoanScan from '@/pages/LoanScan';
+import LoanOffer from '@/pages/LoanOffer';
 
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
@@ -105,6 +107,8 @@ export default function App() {
               <Route path="/consents" element={<ConsentList />} />
               <Route path="/consents/:consentId" element={<ConsentDetail />} />
               <Route path="/transfer" element={<Transfer />} />
+              <Route path="/loan/scan" element={<LoanScan />} />
+              <Route path="/loan/offer/:applicationId" element={<LoanOffer />} />
             </Route>
 
             {/* Fallback */}

@@ -1,0 +1,715 @@
+openapi: 3.1.0
+info:
+  title: Bank Dhofar Open Finance — Auto Loan Origination API
+  version: 1.0.0
+  summary: >
+    Embedded auto-lending APIs for registered auto-lending TPPs
+    (car dealers, DMS vendors).
+  description: |
+    These APIs let a registered auto-lending TPP offer Bank Dhofar auto-loan
+    financing at the point of sale. The TPP owns the UI (Model B); Bank Dhofar
+    exposes only the APIs and the SDK.
+
+    ## Not part of CBO OBIE v4.0
+    This is a **Bank Dhofar Open Finance** product — beyond the CBO-mandated
+    Open Banking scope. It carries commercial terms and is subject to an
+    auto-lending TPP agreement.
+
+    ## Flow summary
+    1. TPP creates an application (`POST /loan-applications`).
+    2. Service returns a QR payload; TPP displays it to the customer.
+    3. Customer scans QR from within the Bank Dhofar mobile app.
+    4. Customer approves the data-sharing + credit-check consent in-app.
+    5. Bank Dhofar runs its decision engine (pulls income/debt data via AISP, calls Mala'a).
+    6. Customer sees the offer in-app, signs with OTP + biometric (or Theqa, when available).
+    7. Bank Dhofar disburses principal to the dealer and sets up monthly standing order.
+    8. Webhook events fire to the dealer at each state transition.
+
+    ## Authentication
+    - **TPP → API**: OAuth 2.0 `client_credentials` grant with the dealer's `client_id` + `client_secret`, scope `auto-lending:applications`.
+    - **Bank Dhofar → TPP webhooks**: HMAC-SHA256 signature over the request body, using the dealer's `webhook_secret`. Header: `X-BD-Signature: sha256=<hex>`.
+    - All POST requests require an `Idempotency-Key` header (UUID recommended).
+
+    ## Sandbox vs production
+    Set `X-BD-Environment: sandbox` to operate in sandbox mode.
+    Sandbox accepts wider parameters, does not move real money, and uses
+    deterministic decision outputs for the seeded test customers.
+
+  contact:
+    name: Bank Dhofar Open Banking Platform Team
+    email: openbanking@bankdhofar.com
+  license:
+    name: Proprietary — Bank Dhofar Auto-Lending TPP Agreement
+
+servers:
+  - url: https://api.tnd.bankdhofar.com/auto-lending/v1
+    description: Sandbox (TND)
+  - url: https://api.sit.bankdhofar.com/auto-lending/v1
+    description: SIT
+  - url: https://api.uat.bankdhofar.com/auto-lending/v1
+    description: UAT
+  - url: https://api.bankdhofar.com/auto-lending/v1
+    description: Production
+
+tags:
+  - name: Applications
+    description: Loan application lifecycle (create, read, cancel)
+  - name: Decisions
+    description: Decision results attached to an application
+  - name: Contracts
+    description: Signed loan contracts
+  - name: Disbursements
+    description: Money movement from BD to dealer
+  - name: Webhooks
+    description: Event subscriptions and delivery replay
+  - name: TPP Onboarding
+    description: Dealer self-serve registration (sandbox only)
+  - name: Health
+    description: Liveness and readiness
+
+paths:
+  # ─────────────────────────────────────────────────────────────
+  # Applications
+  # ─────────────────────────────────────────────────────────────
+  /loan-applications:
+    post:
+      tags: [Applications]
+      summary: Create a loan application and return a QR for the customer
+      operationId: createLoanApplication
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Environment'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApplicationRequest'
+            examples:
+              creta:
+                value:
+                  dealer_reference: "SB-2026-04-14-00042"
+                  branch_code: "SB-SEEB-02"
+                  salesperson_email: "ahmed@muscatmotors.com"
+                  vehicle:
+                    vin: "KMHJ3816FBA012345"
+                    make: "Hyundai"
+                    model: "Creta"
+                    year: 2026
+                    condition: "new"
+                    price:
+                      amount: "12000.000"
+                      currency: "OMR"
+                  requested_amount:
+                    amount: "9600.000"
+                    currency: "OMR"
+                  down_payment:
+                    amount: "2400.000"
+                    currency: "OMR"
+                  requested_tenor_months: 60
+      responses:
+        '201':
+          description: Application created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Application' }
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '429': { $ref: '#/components/responses/Problem429' }
+    get:
+      tags: [Applications]
+      summary: List the TPP's own applications
+      operationId: listLoanApplications
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - $ref: '#/components/parameters/Environment'
+        - name: status
+          in: query
+          schema: { type: string }
+          description: Filter by application status
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Page of applications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Application' }
+                  next_cursor:
+                    type: string
+                    nullable: true
+
+  /loan-applications/{application_id}:
+    get:
+      tags: [Applications]
+      summary: Get an application by ID
+      operationId: getLoanApplication
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - $ref: '#/components/parameters/ApplicationId'
+      responses:
+        '200':
+          description: Application state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Application' }
+        '404': { $ref: '#/components/responses/Problem404' }
+
+  /loan-applications/{application_id}/cancel:
+    post:
+      tags: [Applications]
+      summary: Cancel a pending application
+      operationId: cancelLoanApplication
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - $ref: '#/components/parameters/ApplicationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Application' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409':
+          description: Cannot cancel in current state
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  # ─────────────────────────────────────────────────────────────
+  # Decisions
+  # ─────────────────────────────────────────────────────────────
+  /loan-applications/{application_id}/decision:
+    get:
+      tags: [Decisions]
+      summary: Get the decision for an application
+      operationId: getLoanDecision
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - $ref: '#/components/parameters/ApplicationId'
+      responses:
+        '200':
+          description: Decision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Decision' }
+        '404':
+          description: No decision yet (still pending)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  # ─────────────────────────────────────────────────────────────
+  # Contracts
+  # ─────────────────────────────────────────────────────────────
+  /loan-applications/{application_id}/contract:
+    get:
+      tags: [Contracts]
+      summary: Get the signed contract summary for an application
+      operationId: getLoanContract
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - $ref: '#/components/parameters/ApplicationId'
+      responses:
+        '200':
+          description: Contract
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+        '404': { $ref: '#/components/responses/Problem404' }
+
+  # ─────────────────────────────────────────────────────────────
+  # Disbursements
+  # ─────────────────────────────────────────────────────────────
+  /loan-applications/{application_id}/disbursement:
+    get:
+      tags: [Disbursements]
+      summary: Get disbursement status for an application
+      operationId: getLoanDisbursement
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - $ref: '#/components/parameters/ApplicationId'
+      responses:
+        '200':
+          description: Disbursement status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Disbursement' }
+        '404': { $ref: '#/components/responses/Problem404' }
+
+  # ─────────────────────────────────────────────────────────────
+  # Webhooks (dealer management)
+  # ─────────────────────────────────────────────────────────────
+  /webhooks/me:
+    get:
+      tags: [Webhooks]
+      summary: Show the TPP's current webhook config
+      operationId: getWebhookConfig
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      responses:
+        '200':
+          description: Webhook config
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookConfig' }
+    put:
+      tags: [Webhooks]
+      summary: Update the TPP's webhook URL (the secret is rotated via POST /webhooks/rotate-secret)
+      operationId: updateWebhookConfig
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [webhook_url]
+              properties:
+                webhook_url: { type: string, format: uri }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookConfig' }
+
+  /webhooks/rotate-secret:
+    post:
+      tags: [Webhooks]
+      summary: Rotate the webhook signing secret
+      operationId: rotateWebhookSecret
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: New secret (returned once; never retrievable again)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [webhook_secret]
+                properties:
+                  webhook_secret: { type: string }
+
+  /webhooks/replay/{webhook_id}:
+    post:
+      tags: [Webhooks]
+      summary: Manually replay a failed webhook delivery
+      operationId: replayWebhook
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - name: webhook_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Replay queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookDelivery' }
+
+  /webhooks/deliveries:
+    get:
+      tags: [Webhooks]
+      summary: List webhook delivery history
+      operationId: listWebhookDeliveries
+      security:
+        - tppOAuth2: [auto-lending:applications]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, delivered, failed, dead_letter] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        '200':
+          description: Delivery history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/WebhookDelivery' }
+
+  # ─────────────────────────────────────────────────────────────
+  # TPP Self-Serve Onboarding (sandbox only)
+  # ─────────────────────────────────────────────────────────────
+  /tpp/sandbox-signup:
+    post:
+      tags: [TPP Onboarding]
+      summary: Self-serve dealer registration (sandbox only)
+      description: >
+        Issues sandbox `client_id` + `client_secret`. Production onboarding
+        requires a signed auto-lending TPP agreement and KYC; contact the
+        Open Banking team.
+      operationId: sandboxSignup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SandboxSignupRequest' }
+      responses:
+        '201':
+          description: Credentials issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SandboxSignupResponse' }
+
+  # ─────────────────────────────────────────────────────────────
+  # Health
+  # ─────────────────────────────────────────────────────────────
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      operationId: healthz
+      security: []
+      responses:
+        '200':
+          description: Alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "ok" }
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      operationId: readyz
+      security: []
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Dependency down
+
+components:
+  # ─────────────────────────────────────────────────────────────
+  # Security
+  # ─────────────────────────────────────────────────────────────
+  securitySchemes:
+    tppOAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.tnd.bankdhofar.com/auto-lending/v1/oauth/token
+          scopes:
+            auto-lending:applications: Create and manage loan applications
+
+  # ─────────────────────────────────────────────────────────────
+  # Parameters
+  # ─────────────────────────────────────────────────────────────
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+      description: UUID recommended. Identical requests within 24h return the original response.
+    Environment:
+      name: X-BD-Environment
+      in: header
+      required: false
+      schema:
+        type: string
+        enum: [sandbox, production]
+        default: sandbox
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema: { type: string }
+      description: Echoed back in responses and logs.
+    ApplicationId:
+      name: application_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  # ─────────────────────────────────────────────────────────────
+  # Responses (RFC 7807)
+  # ─────────────────────────────────────────────────────────────
+  responses:
+    Problem400:
+      description: Bad request
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Problem401:
+      description: Unauthorized
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Problem403:
+      description: Forbidden
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Problem404:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Problem409:
+      description: Conflict
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Problem422:
+      description: Semantic validation failure
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Problem429:
+      description: Rate limit exceeded
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  # ─────────────────────────────────────────────────────────────
+  # Schemas
+  # ─────────────────────────────────────────────────────────────
+  schemas:
+    Problem:
+      type: object
+      description: RFC 7807 problem details
+      required: [type, title, status]
+      properties:
+        type:        { type: string, format: uri, example: "https://bd.om/errors/application-not-found" }
+        title:       { type: string, example: "Application not found" }
+        status:      { type: integer, example: 404 }
+        detail:      { type: string }
+        instance:    { type: string, format: uri }
+        correlation_id: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:   { type: string }
+              message: { type: string }
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:   { type: string, pattern: '^\d+\.\d{3}$', example: "12000.000" }
+        currency: { type: string, enum: [OMR], default: OMR }
+
+    Vehicle:
+      type: object
+      required: [make, model, year, condition, price]
+      properties:
+        vin:        { type: string, nullable: true }
+        make:       { type: string, example: "Hyundai" }
+        model:      { type: string, example: "Creta" }
+        year:       { type: integer, minimum: 1990, maximum: 2030 }
+        condition:  { type: string, enum: [new, used] }
+        price:      { $ref: '#/components/schemas/Money' }
+
+    CreateApplicationRequest:
+      type: object
+      required:
+        - vehicle
+        - requested_amount
+        - down_payment
+        - requested_tenor_months
+      properties:
+        dealer_reference: { type: string, maxLength: 100, nullable: true }
+        branch_code:      { type: string, maxLength: 50,  nullable: true }
+        salesperson_email: { type: string, format: email, nullable: true }
+        vehicle:          { $ref: '#/components/schemas/Vehicle' }
+        requested_amount: { $ref: '#/components/schemas/Money' }
+        down_payment:     { $ref: '#/components/schemas/Money' }
+        requested_tenor_months: { type: integer, minimum: 12, maximum: 84 }
+
+    Application:
+      type: object
+      required: [application_id, status, dealer_id, vehicle, qr, environment, created_at]
+      properties:
+        application_id:   { type: string, format: uuid }
+        dealer_id:        { type: string }
+        dealer_reference: { type: string, nullable: true }
+        branch_code:      { type: string, nullable: true }
+        salesperson_email: { type: string, nullable: true }
+        customer_id:      { type: string, nullable: true, description: "Populated after customer approves consent" }
+        vehicle:          { $ref: '#/components/schemas/Vehicle' }
+        requested_amount: { $ref: '#/components/schemas/Money' }
+        down_payment:     { $ref: '#/components/schemas/Money' }
+        requested_tenor_months: { type: integer }
+        status:
+          type: string
+          enum: [pending_consent, pending_decision, decided, declined, contracted, disbursed, expired, cancelled]
+        qr:
+          type: object
+          properties:
+            payload:    { type: string, description: "URL to encode as QR" }
+            expires_at: { type: string, format: date-time }
+        decision:      { $ref: '#/components/schemas/Decision', nullable: true }
+        environment:   { type: string, enum: [sandbox, production] }
+        created_at:    { type: string, format: date-time }
+        updated_at:    { type: string, format: date-time }
+
+    Decision:
+      type: object
+      required: [decision, decided_at]
+      properties:
+        decision:
+          type: string
+          enum: [approved, declined, conditional]
+        approved_amount:     { $ref: '#/components/schemas/Money', nullable: true }
+        interest_rate:       { type: number, format: float, nullable: true, example: 5.5 }
+        tenor_months:        { type: integer, nullable: true }
+        monthly_installment: { $ref: '#/components/schemas/Money', nullable: true }
+        total_repayable:     { $ref: '#/components/schemas/Money', nullable: true }
+        total_interest:      { $ref: '#/components/schemas/Money', nullable: true }
+        decline_reasons:
+          type: array
+          items:
+            type: string
+            enum: [insufficient_income, dbr_exceeded, credit_score_low, policy_exclusion, below_min_loan, above_max_loan]
+        conditions:
+          type: array
+          items: { type: string }
+          nullable: true
+        decided_at:  { type: string, format: date-time }
+        valid_until: { type: string, format: date-time }
+
+    Contract:
+      type: object
+      required: [contract_id, application_id, signed_at, terms]
+      properties:
+        contract_id:    { type: string, format: uuid }
+        application_id: { type: string, format: uuid }
+        signed_at:      { type: string, format: date-time }
+        signature_method: { type: string, enum: [otp_biometric, theqa] }
+        terms:
+          type: object
+          properties:
+            principal:           { $ref: '#/components/schemas/Money' }
+            interest_rate:       { type: number }
+            tenor_months:        { type: integer }
+            monthly_installment: { $ref: '#/components/schemas/Money' }
+            total_repayable:     { $ref: '#/components/schemas/Money' }
+            first_payment_date:  { type: string, format: date }
+
+    Disbursement:
+      type: object
+      required: [disbursement_id, status, amount]
+      properties:
+        disbursement_id:   { type: string, format: uuid }
+        application_id:    { type: string, format: uuid }
+        contract_id:       { type: string, format: uuid }
+        amount:            { $ref: '#/components/schemas/Money' }
+        dealer_account_id: { type: string }
+        status:            { type: string, enum: [pending, sent, completed, failed] }
+        transaction_id:    { type: string, nullable: true }
+        executed_at:       { type: string, format: date-time, nullable: true }
+
+    WebhookConfig:
+      type: object
+      required: [webhook_url, events]
+      properties:
+        webhook_url: { type: string, format: uri }
+        events:
+          type: array
+          items: { type: string }
+
+    WebhookDelivery:
+      type: object
+      properties:
+        webhook_id:          { type: string, format: uuid }
+        event_type:          { type: string }
+        application_id:      { type: string, format: uuid, nullable: true }
+        status:              { type: string, enum: [pending, delivered, failed, dead_letter] }
+        delivery_attempts:   { type: integer }
+        last_attempted_at:   { type: string, format: date-time, nullable: true }
+        delivered_at:        { type: string, format: date-time, nullable: true }
+        last_response_code:  { type: integer, nullable: true }
+        last_error:          { type: string, nullable: true }
+
+    SandboxSignupRequest:
+      type: object
+      required: [dealer_name, cr_number, webhook_url, contact_email]
+      properties:
+        dealer_name:   { type: string, maxLength: 255 }
+        cr_number:     { type: string, maxLength: 50 }
+        rop_dealer_code: { type: string, maxLength: 50, nullable: true }
+        webhook_url:   { type: string, format: uri }
+        contact_email: { type: string, format: email }
+
+    SandboxSignupResponse:
+      type: object
+      required: [tpp_id, client_id, client_secret, webhook_secret]
+      properties:
+        tpp_id:         { type: string }
+        client_id:      { type: string }
+        client_secret:  { type: string, description: "Shown once — not retrievable again" }
+        webhook_secret: { type: string, description: "Shown once — not retrievable again" }
+
+  # ─────────────────────────────────────────────────────────────
+  # Webhook event payload schemas (for documentation; webhooks
+  # are delivered as HTTP POST to the TPP's registered webhook_url)
+  # ─────────────────────────────────────────────────────────────
+  # The events are:
+  #   loan_application.decided
+  #   loan_application.declined
+  #   loan_application.contracted
+  #   loan_application.disbursed
+  #   loan_application.expired
+  #   loan_application.cancelled
+  #
+  # Each event body:
+  #   {
+  #     "event_id": "...",
+  #     "event_type": "loan_application.decided",
+  #     "occurred_at": "2026-04-14T12:30:00Z",
+  #     "application_id": "...",
+  #     "data": { ... event-specific ... }
+  #   }

@@ -1,0 +1,164 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ob-loan-service
+  namespace: ob-tnd
+  labels:
+    app: ob-loan-service
+    app.kubernetes.io/part-of: qantara
+    app.kubernetes.io/component: open-finance
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app: ob-loan-service
+  template:
+    metadata:
+      labels:
+        app: ob-loan-service
+        app.kubernetes.io/part-of: qantara
+        app.kubernetes.io/component: open-finance
+    spec:
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: ob-loan-service
+          image: registry.bankdhofar.com/ea/open-banking/ob-loan-service:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: SERVICE_NAME
+              value: ob-loan-service
+            - name: ENVIRONMENT
+              value: tnd
+            - name: LOG_LEVEL
+              value: INFO
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-postgres-app
+                  key: uri
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ob-loan-service-redis
+                  key: url
+                  optional: true
+            - name: BANKING_API_BASE_URL
+              value: http://ob-consent-service:8000/banking
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ob-loan-service
+  namespace: ob-tnd
+  labels:
+    app: ob-loan-service
+spec:
+  type: ClusterIP
+  selector:
+    app: ob-loan-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+---
+# Redis (lightweight, for idempotency cache + rate limiting)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ob-loan-service-redis
+  namespace: ob-tnd
+  labels:
+    app: ob-loan-service-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ob-loan-service-redis
+  template:
+    metadata:
+      labels:
+        app: ob-loan-service-redis
+    spec:
+      containers:
+        - name: redis
+          image: harbor.cp.bankdhofar.com/dockerhub/redis:7-alpine
+          ports:
+            - name: redis
+              containerPort: 6379
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ob-loan-service-redis
+  namespace: ob-tnd
+spec:
+  type: ClusterIP
+  selector:
+    app: ob-loan-service-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ob-loan-service-redis
+  namespace: ob-tnd
+type: Opaque
+stringData:
+  url: redis://ob-loan-service-redis:6379/0
