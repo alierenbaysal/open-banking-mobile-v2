@@ -25,8 +25,19 @@ export default function RootLayout() {
   const segments = useSegments();
 
   const refreshAuth = useCallback(async () => {
-    const u = await getCurrentUser();
-    setUser(u);
+    try {
+      // Safety net: never block the UI on a slow / hung AsyncStorage read.
+      // 3 s is generous — AsyncStorage typically returns in <50 ms. If we
+      // hit the timeout we assume unauthenticated and let the user sign in
+      // again, which is recoverable; a frozen spinner is not.
+      const u = await Promise.race([
+        getCurrentUser(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      ]);
+      setUser(u);
+    } catch {
+      setUser(null);
+    }
   }, []);
 
   useEffect(() => { refreshAuth(); }, [refreshAuth, segments]);

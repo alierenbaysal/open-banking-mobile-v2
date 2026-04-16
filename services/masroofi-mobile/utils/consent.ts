@@ -175,15 +175,31 @@ export interface ExchangeResult {
 }
 
 export async function exchangeAuthCode(code: string): Promise<ExchangeResult> {
-  const response = await fetch(`${API_BASE}/api/auth-codes/exchange`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      code,
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-    }),
-  });
+  // 15 s hard timeout — if the backend is slow the callback screen must
+  // surface an error rather than hang on its processing spinner forever.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/auth-codes/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    throw new Error(
+      err instanceof Error && err.name === "AbortError"
+        ? "Timed out waiting for Bank Dhofar to exchange the authorisation code."
+        : `Network error exchanging code: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  clearTimeout(timer);
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
