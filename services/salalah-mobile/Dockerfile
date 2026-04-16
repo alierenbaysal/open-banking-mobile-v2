@@ -46,7 +46,7 @@ COPY . .
 # context → "Cannot use import.meta outside a module" at bundle init.
 # Neutralize at build-time: replace `import.meta.env` with `({})`.
 RUN find node_modules/zustand -name '*.js' -exec \
-      sed -i 's/import\.meta\.env/({})/g' {} +
+      sed -i 's/import\.meta\.env/({})/g' {} \;
 
 # Sanity check: the entry point must resolve. Fails early if package.json
 # "main" or app.json "entryPoint" is broken.
