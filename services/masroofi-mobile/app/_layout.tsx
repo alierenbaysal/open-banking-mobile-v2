@@ -92,15 +92,12 @@ export default function RootLayout() {
     }
   }, [user, segments, router]);
 
-  if (user === undefined) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <StatusBar style="dark" />
-      </View>
-    );
-  }
-
+  // Render the Stack immediately even while auth is still resolving. A
+  // gating spinner here blocks router.push() events queued during mount
+  // (deep-link callbacks) because the navigator hasn't been created yet;
+  // that caused a frozen purple ActivityIndicator on return from BD Online.
+  // Auth redirects happen in the effect above once `user` resolves; until
+  // then the initial route renders naturally.
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />

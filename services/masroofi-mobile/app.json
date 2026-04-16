@@ -3,7 +3,7 @@
     "name": "Masroofi",
     "slug": "masroofi-mobile",
     "scheme": "masroofi",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
@@ -46,6 +46,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "runtimeVersion": "exposdk:54.0.0"
   }
 }
