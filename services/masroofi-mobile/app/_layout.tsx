@@ -93,15 +93,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: theme.colors.bg },
-          animation: "fade",
-        }}
-      >
-        <Stack.Screen name="(public)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(public)" />
+        <Stack.Screen name="(auth)" />
       </Stack>
     </GestureHandlerRootView>
   );
