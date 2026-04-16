@@ -37,7 +37,7 @@ const CONSENT_ID_KEY = "masroofi_consent_id";
 // mobile app does not depend on the nginx rewrites inside the web service.
 // ---------------------------------------------------------------------------
 
-export const API_BASE = "https://masroofi.tnd.bankdhofar.com";
+export const API_BASE = "https://masroofi-api.omtd.bankdhofar.com";
 
 // ---------------------------------------------------------------------------
 // Session persistence (plain AsyncStorage — email/name are not secrets)

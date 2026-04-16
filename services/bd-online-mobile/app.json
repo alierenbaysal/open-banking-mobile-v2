@@ -38,6 +38,8 @@
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "newArchEnabled": false,
+    "jsEngine": "hermes"
   }
 }

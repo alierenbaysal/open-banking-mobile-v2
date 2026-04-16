@@ -20,7 +20,7 @@ export const HISAB_API_BASE = "https://hisab-api.omtd.bankdhofar.com/api";
 export const QANTARA_BASE = "https://qantara-api.omtd.bankdhofar.com";
 
 /** BD Online consent approval origin. */
-export const BD_ONLINE_BASE = "https://banking.tnd.bankdhofar.com";
+export const BD_ONLINE_BASE = "https://banking-api.omtd.bankdhofar.com";
 
 /** AISP base (OBIE v4.0). */
 const AISP_BASE = `${QANTARA_BASE}/open-banking/v4.0/aisp`;

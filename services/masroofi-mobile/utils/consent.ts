@@ -4,7 +4,7 @@
  * Flow on mobile:
  *   1. POST /api/consent to create an account-access consent.
  *   2. Launch BD Online via the `bdonline://consent/approve?...` deep link
- *      (falls back to https://banking.tnd.bankdhofar.com/consent/approve
+ *      (falls back to https://banking-api.omtd.bankdhofar.com/consent/approve
  *      via WebBrowser if the bank app is not installed).
  *   3. BD Online approves/rejects and redirects back to `masroofi://callback?code=...&state=...`.
  *   4. We exchange the code at /api/auth-codes/exchange for an access
@@ -23,7 +23,7 @@ const STATE_KEY = "masroofi_oauth_state";
 const CLIENT_ID = "masroofi-demo";
 const CLIENT_SECRET = "masroofi-demo-secret-tnd";
 
-const BD_ONLINE_WEB = "https://banking.tnd.bankdhofar.com";
+const BD_ONLINE_WEB = "https://banking-api.omtd.bankdhofar.com";
 const BD_ONLINE_DEEPLINK = "bdonline://consent/approve";
 
 export const MASROOFI_CALLBACK_URL = "masroofi://callback";

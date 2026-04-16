@@ -25,6 +25,8 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "newArchEnabled": false,
+    "jsEngine": "hermes"
   }
 }

@@ -2,7 +2,7 @@
  * BD Online API client.
  *
  * All requests go to the public DMZ-fronted host:
- *   https://banking.tnd.bankdhofar.com/api/...
+ *   https://banking-api.omtd.bankdhofar.com/api/...
  * which is served by ob-consent-service. CORS is allowed.
  *
  * Auth is session-cookie based (cookie name: `manara_session`).
@@ -15,7 +15,7 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
-export const API_BASE = "https://banking.tnd.bankdhofar.com";
+export const API_BASE = "https://banking-api.omtd.bankdhofar.com";
 
 const SESSION_KEY = "bd_online_session_cookie";
 const CUSTOMER_KEY = "bd_online_customer_id";

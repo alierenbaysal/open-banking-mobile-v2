@@ -27,9 +27,7 @@ export default function RootLayout() {
     setMerchant(m);
   }, []);
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  useEffect(() => { checkAuth(); }, [checkAuth, segments]);
 
   useEffect(() => {
     if (merchant === undefined) return;

@@ -25,10 +25,18 @@
         {
           "action": "VIEW",
           "data": [
-            { "scheme": "sadad" },
-            { "scheme": "https", "host": "sadad.tnd.bankdhofar.com" }
+            {
+              "scheme": "sadad"
+            },
+            {
+              "scheme": "https",
+              "host": "sadad.tnd.bankdhofar.com"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -38,6 +46,8 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "newArchEnabled": false,
+    "jsEngine": "hermes"
   }
 }

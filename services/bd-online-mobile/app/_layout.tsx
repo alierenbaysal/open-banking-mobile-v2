@@ -35,9 +35,7 @@ export default function RootLayout() {
     setUser(u);
   }, []);
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  useEffect(() => { checkAuth(); }, [checkAuth, segments]);
 
   useEffect(() => {
     if (user === undefined) return; // still loading

@@ -29,9 +29,7 @@ export default function RootLayout() {
     setUser(u);
   }, []);
 
-  useEffect(() => {
-    refreshAuth();
-  }, [refreshAuth]);
+  useEffect(() => { refreshAuth(); }, [refreshAuth, segments]);
 
   // Deep-link listener — route BD Online callbacks into /(public)/callback
   useEffect(() => {

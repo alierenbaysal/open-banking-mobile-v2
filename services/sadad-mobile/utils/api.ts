@@ -7,12 +7,12 @@
  * - Transaction history
  *
  * All endpoints here assume the demo/stub data shape returned by
- * `services/sadad/` on `https://sadad.tnd.bankdhofar.com`. For parts that the
+ * `services/sadad/` on `https://sadad-api.omtd.bankdhofar.com`. For parts that the
  * backend does not yet expose, we return plausible mock data so the UI has
  * something to render during development.
  */
 
-export const SADAD_API_BASE = "https://sadad.tnd.bankdhofar.com/api";
+export const SADAD_API_BASE = "https://sadad-api.omtd.bankdhofar.com/api";
 export const BD_ONLINE_DEEPLINK_BASE = "bdonline://consent/approve";
 
 export interface PaymentSession {

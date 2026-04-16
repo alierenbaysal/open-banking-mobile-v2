@@ -13,7 +13,9 @@
       "bundleIdentifier": "com.bankdhofar.masroofi",
       "supportsTablet": true,
       "infoPlist": {
-        "LSApplicationQueriesSchemes": ["bdonline"]
+        "LSApplicationQueriesSchemes": [
+          "bdonline"
+        ]
       }
     },
     "android": {
@@ -26,9 +28,15 @@
           "action": "VIEW",
           "autoVerify": false,
           "data": [
-            { "scheme": "masroofi", "host": "callback" }
+            {
+              "scheme": "masroofi",
+              "host": "callback"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -38,6 +46,8 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "newArchEnabled": false,
+    "jsEngine": "hermes"
   }
 }
