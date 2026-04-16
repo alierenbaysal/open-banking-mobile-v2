@@ -39,6 +39,27 @@ WORKDIR /workspace
 COPY --from=deps /workspace/node_modules ./node_modules
 COPY . .
 
+
+# Patch @react-navigation/routers/StackRouter.js getRehydratedState against
+# undefined state.routes. The crash (StackRouter.js:84 state.routes.filter)
+# fires when expo-router rehydrates a persisted state shape that no longer
+# matches the current navigator definition.
+RUN node -e "\
+const fs = require('fs'); \
+function patch(file) { \
+  const orig = fs.readFileSync(file, 'utf8'); \
+  let s = orig; \
+  s = s.replace(/state\.routes\.filter\(/g, '(state.routes || []).filter('); \
+  s = s.replace(/state\.preloadedRoutes\?\.filter\(/g, '(state.preloadedRoutes || []).filter('); \
+  if (s !== orig) fs.writeFileSync(file, s); \
+} \
+for (const t of [ \
+  'node_modules/@react-navigation/routers/lib/module/StackRouter.js', \
+  'node_modules/@react-navigation/routers/lib/commonjs/StackRouter.js', \
+  'node_modules/@react-navigation/routers/lib/module/TabRouter.js', \
+  'node_modules/@react-navigation/routers/lib/commonjs/TabRouter.js', \
+]) if (fs.existsSync(t)) patch(t);"
+
 # Sanity check: the entry point must resolve. Fails early if package.json
 # "main" or app.json "entryPoint" is broken.
 RUN node -e "require.resolve(require('./package.json').main || './index.ts')" || \

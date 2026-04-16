@@ -39,6 +39,40 @@ WORKDIR /workspace
 COPY --from=deps /workspace/node_modules ./node_modules
 COPY . .
 
+# Patch @react-navigation/routers/StackRouter.js getRehydratedState against
+# undefined state.routes. The crash (StackRouter.js:84 `state.routes.filter`)
+# fires when expo-router tries to rehydrate a persisted state shape that
+# no longer matches the current navigator definition — common after
+# layout changes ship to a cached Expo Go bundle.
+RUN node -e "\
+const fs = require('fs'); const path = require('path'); \
+const guards = [ \
+  /(state)\.(routes)\.filter/g, \
+  /(state)\.(preloadedRoutes)\?\.filter/g, \
+]; \
+function patch(file) { \
+  let s = fs.readFileSync(file, 'utf8'); \
+  let changed = false; \
+  s = s.replace(/state\.routes\.filter\(/g, '(state.routes || []).filter('); \
+  s = s.replace(/state\.preloadedRoutes\?\.filter\(/g, '(state.preloadedRoutes || []).filter('); \
+  if (s !== fs.readFileSync(file, 'utf8')) { fs.writeFileSync(file, s); changed = true; } \
+  return changed; \
+} \
+const targets = [ \
+  'node_modules/@react-navigation/routers/lib/module/StackRouter.js', \
+  'node_modules/@react-navigation/routers/lib/commonjs/StackRouter.js', \
+  'node_modules/@react-navigation/routers/lib/module/TabRouter.js', \
+  'node_modules/@react-navigation/routers/lib/commonjs/TabRouter.js', \
+]; \
+for (const t of targets) { \
+  if (fs.existsSync(t)) { \
+    const c = patch(t); \
+    console.log(c ? 'patched ' + t : 'no-op  ' + t); \
+  } else { \
+    console.log('missing ' + t); \
+  } \
+}"
+
 # Sanity check: the entry point must resolve. Fails early if package.json
 # "main" or app.json "entryPoint" is broken.
 RUN node -e "require.resolve(require('./package.json').main || './index.ts')" || \
