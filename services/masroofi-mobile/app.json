@@ -46,7 +46,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "runtimeVersion": "exposdk:54.0.0"
+    }
   }
 }

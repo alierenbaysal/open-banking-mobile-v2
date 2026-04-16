@@ -25,15 +25,14 @@ export default function RootLayout() {
   const segments = useSegments();
 
   const refreshAuth = useCallback(async () => {
+    // No timeout — AsyncStorage.getItem on a freshly-loaded bundle can
+    // take a beat on cold start; racing it against a short timer caused
+    // us to treat legit sessions as signed-out on every deep-link return
+    // ("asking for login again and again"). If the read genuinely hangs
+    // the Stack below still renders so the UI never freezes; only the
+    // auth-redirect side-effect waits for a real answer.
     try {
-      // Safety net: never block the UI on a slow / hung AsyncStorage read.
-      // 3 s is generous — AsyncStorage typically returns in <50 ms. If we
-      // hit the timeout we assume unauthenticated and let the user sign in
-      // again, which is recoverable; a frozen spinner is not.
-      const u = await Promise.race([
-        getCurrentUser(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-      ]);
+      const u = await getCurrentUser();
       setUser(u);
     } catch {
       setUser(null);
