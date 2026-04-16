@@ -1,16 +1,12 @@
 /**
- * ThroughputArea — area chart for hourly tx count over the last 12 hours.
- * Uses victory-native for the area geometry.
+ * ThroughputArea — simple area chart using react-native-svg.
+ * Replaces the legacy victory-native implementation which isn't
+ * compatible with modern Expo / new architecture.
  */
 
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import {
-  VictoryArea,
-  VictoryAxis,
-  VictoryChart,
-  VictoryTheme,
-} from "victory-native";
+import Svg, { Path, Line, Text as SvgText } from "react-native-svg";
 
 import { MERCHANT_THEME, RADIUS } from "../../theme";
 import type { ThroughputPoint } from "../../utils/api";
@@ -23,76 +19,77 @@ interface Props {
 }
 
 export default function ThroughputArea({ data, width = 320, height = 200 }: Props) {
-  const chartData = data.map((p) => ({
-    x: formatHour(p.hour),
-    y: p.count,
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.title}>Throughput</Text>
+        <Text style={styles.subtitle}>No data</Text>
+      </View>
+    );
+  }
+  const pad = { top: 20, bottom: 30, left: 36, right: 12 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const max = Math.max(...data.map((p) => p.count), 1);
+  const step = plotW / Math.max(1, data.length - 1);
+
+  const points = data.map((p, i) => ({
+    x: pad.left + i * step,
+    y: pad.top + plotH - (p.count / max) * plotH,
   }));
+
+  const pathD =
+    "M " +
+    points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ") +
+    ` L ${pad.left + plotW},${pad.top + plotH} L ${pad.left},${pad.top + plotH} Z`;
+
+  const gridY = [0.25, 0.5, 0.75].map((t) => pad.top + plotH * t);
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>Throughput</Text>
-        <Text style={styles.subtitle}>Last 12 hours</Text>
+        <Text style={styles.subtitle}>Last {data.length} hours</Text>
       </View>
-      <VictoryChart
-        theme={VictoryTheme.material}
-        width={width}
-        height={height}
-        padding={{ top: 10, bottom: 30, left: 36, right: 12 }}
-        domainPadding={{ x: [8, 8], y: [0, 10] }}
-      >
-        <VictoryAxis
-          style={{
-            axis: { stroke: MERCHANT_THEME.border.default },
-            tickLabels: { fill: MERCHANT_THEME.text.muted, fontSize: 9, padding: 4 },
-            grid: { stroke: "transparent" },
-          }}
-          tickValues={chartData.filter((_, i) => i % 2 === 0).map((d) => d.x)}
-        />
-        <VictoryAxis
-          dependentAxis
-          style={{
-            axis: { stroke: "transparent" },
-            tickLabels: { fill: MERCHANT_THEME.text.muted, fontSize: 9, padding: 2 },
-            grid: { stroke: MERCHANT_THEME.border.default, strokeDasharray: "2,4" },
-          }}
-        />
-        <VictoryArea
-          data={chartData}
-          interpolation="monotoneX"
-          style={{
-            data: {
-              fill: MERCHANT_THEME.accent.cyan,
-              fillOpacity: 0.18,
-              stroke: MERCHANT_THEME.accent.cyan,
-              strokeWidth: 2,
-            },
-          }}
-        />
-      </VictoryChart>
+      <Svg width={width} height={height}>
+        {gridY.map((y, i) => (
+          <Line
+            key={i}
+            x1={pad.left}
+            x2={pad.left + plotW}
+            y1={y}
+            y2={y}
+            stroke={MERCHANT_THEME.border.default}
+            strokeDasharray="2,4"
+          />
+        ))}
+        <Path d={pathD} fill={MERCHANT_THEME.primary + "33"} stroke={MERCHANT_THEME.primary} strokeWidth={2} />
+        {data.filter((_, i) => i % 2 === 0).map((p, i) => (
+          <SvgText
+            key={i}
+            x={pad.left + i * 2 * step}
+            y={height - 10}
+            fontSize="9"
+            fill={MERCHANT_THEME.text.muted}
+            textAnchor="middle"
+          >
+            {formatHour(p.hour)}
+          </SvgText>
+        ))}
+      </Svg>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: MERCHANT_THEME.bg.card,
+    backgroundColor: MERCHANT_THEME.surface,
     borderRadius: RADIUS.lg,
+    padding: 14,
     borderWidth: 1,
     borderColor: MERCHANT_THEME.border.default,
-    padding: 14,
   },
-  header: {
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: MERCHANT_THEME.text.primary,
-  },
-  subtitle: {
-    fontSize: 11,
-    color: MERCHANT_THEME.text.muted,
-    marginTop: 2,
-  },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  title: { fontSize: 14, fontWeight: "700", color: MERCHANT_THEME.text.primary },
+  subtitle: { fontSize: 11, color: MERCHANT_THEME.text.muted },
 });
