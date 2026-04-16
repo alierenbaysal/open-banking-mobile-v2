@@ -23,8 +23,6 @@
     "plugins": [
       "expo-router",
       "expo-secure-store"
-    ],
-    "newArchEnabled": false,
-    "jsEngine": "hermes"
+    ]
   }
 }
