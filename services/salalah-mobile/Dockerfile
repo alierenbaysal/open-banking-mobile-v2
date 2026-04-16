@@ -41,6 +41,13 @@ WORKDIR /workspace
 COPY --from=deps /workspace/node_modules ./node_modules
 COPY . .
 
+# zustand ships `import.meta.env.MODE` DEV-warning checks in its compiled
+# output. Hermes / Metro web can't evaluate `import.meta` outside an ESM
+# context → "Cannot use import.meta outside a module" at bundle init.
+# Neutralize at build-time: replace `import.meta.env` with `({})`.
+RUN find node_modules/zustand -name '*.js' -exec \
+      sed -i 's/import\.meta\.env/({})/g' {} +
+
 # Sanity check: the entry point must resolve. Fails early if package.json
 # "main" or app.json "entryPoint" is broken.
 RUN node -e "require.resolve(require('./package.json').main || './index.ts')" || \
