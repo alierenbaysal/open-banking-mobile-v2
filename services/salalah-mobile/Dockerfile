@@ -45,8 +45,8 @@ COPY . .
 # output. Hermes / Metro web can't evaluate `import.meta` outside an ESM
 # context → "Cannot use import.meta outside a module" at bundle init.
 # Neutralize at build-time: replace `import.meta.env` with `({})`.
-RUN find node_modules/zustand -name '*.js' -exec \
-      sed -i 's/import\.meta\.env/({})/g' {} \;
+RUN find node_modules/zustand \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) \
+      -exec sed -i 's/import\.meta\.env/({})/g' {} \;
 
 # Sanity check: the entry point must resolve. Fails early if package.json
 # "main" or app.json "entryPoint" is broken.
