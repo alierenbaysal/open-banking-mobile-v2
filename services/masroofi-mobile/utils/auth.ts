@@ -31,6 +31,14 @@ const SESSION_KEY = "masroofi_session";
 const BANK_TOKEN_KEY = "masroofi_bank_token";
 const CONSENT_ID_KEY = "masroofi_consent_id";
 
+// Demo-mode auto-wiring: skip the OAuth consent redirect entirely.
+// Expo Go can't persist AsyncStorage across deep-link app switches, so the
+// BD Online ↔ Masroofi round-trip loses the session every time. For the
+// demo we pre-seed consents in Postgres and auto-wire them on signup/login.
+const DEMO_CONSENT_AHMED = "aaaaaaaa-bbbb-cccc-dddd-000000000001";
+const DEMO_CONSENT_FATIMA = "aaaaaaaa-bbbb-cccc-dddd-000000000002";
+const DEMO_CONSENT_DEFAULT = DEMO_CONSENT_AHMED;
+
 // ---------------------------------------------------------------------------
 // API base URL — matches the web app's proxy at masroofi.tnd.bankdhofar.com.
 // We call the same paths but directly against the public origin so the
@@ -197,6 +205,11 @@ export async function signup(
     const user = (await resp.json()) as RegisterResponse;
     const session: MasroofiUser = { email, name, createdAt: user.created_at };
     await setSession(session);
+    // Auto-wire demo bank: every signup gets Ahmed's accounts pre-connected
+    // so the dashboard shows real data immediately, no consent round-trip.
+    const consentId = email.includes("fatima") ? DEMO_CONSENT_FATIMA : DEMO_CONSENT_DEFAULT;
+    await secureSet(CONSENT_ID_KEY, consentId);
+    await secureSet(BANK_TOKEN_KEY, consentId);
     return { ok: true, user: session };
   } catch {
     return { ok: false, error: "Network error — please try again" };
@@ -226,10 +239,14 @@ export async function login(
     };
     await setSession(session);
 
-    // Restore cached bank credentials from the DB record.
+    // Restore cached bank credentials from the DB record, OR auto-wire demo.
     if (user.consent_id) {
       await secureSet(CONSENT_ID_KEY, user.consent_id);
       await secureSet(BANK_TOKEN_KEY, user.bank_token || user.consent_id);
+    } else {
+      const consentId = email.includes("fatima") ? DEMO_CONSENT_FATIMA : DEMO_CONSENT_DEFAULT;
+      await secureSet(CONSENT_ID_KEY, consentId);
+      await secureSet(BANK_TOKEN_KEY, consentId);
     }
 
     return { ok: true, user: session };
