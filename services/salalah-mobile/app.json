@@ -13,9 +13,10 @@
     "ios": {
       "bundleIdentifier": "com.bankdhofar.salalahsouq",
       "supportsTablet": true,
-      "buildNumber": "7",
+      "buildNumber": "8",
       "infoPlist": {
-        "LSApplicationQueriesSchemes": ["bdonline"]
+        "LSApplicationQueriesSchemes": ["bdonline"],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
