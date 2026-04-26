@@ -171,6 +171,32 @@ spec:
                   'Active'
               ) ON CONFLICT (tpp_id) DO NOTHING;
 
+              -- Seed Masroofi TPP
+              INSERT INTO tpp_registry (tpp_id, tpp_name, tpp_name_ar, registration_number, is_aisp, is_pisp, is_cisp, client_id, redirect_uris, status)
+              VALUES (
+                  'masroofi-demo',
+                  'Masroofi',
+                  'مصروفي',
+                  'CBO-MASROOFI-001',
+                  true, false, false,
+                  'masroofi-demo',
+                  ARRAY['masroofi://callback', 'exp://expo-masroofi.omtd.bankdhofar.com/--/callback', 'https://masroofi-api.omtd.bankdhofar.com/oauth/callback'],
+                  'Active'
+              ) ON CONFLICT (tpp_id) DO NOTHING;
+
+              -- Seed Salalah Souq TPP (PISP for e-commerce payments)
+              INSERT INTO tpp_registry (tpp_id, tpp_name, tpp_name_ar, registration_number, is_aisp, is_pisp, is_cisp, client_id, redirect_uris, status)
+              VALUES (
+                  'salalah-souq-demo',
+                  'Salalah Souq',
+                  'سوق صلالة',
+                  'CBO-SALALAH-001',
+                  false, true, false,
+                  'salalah-souq-demo',
+                  ARRAY['salalahsouq://callback', 'exp://expo-salalah.omtd.bankdhofar.com/--/callback'],
+                  'Active'
+              ) ON CONFLICT (tpp_id) DO NOTHING;
+
               SQL
 
               echo "Database initialization complete."

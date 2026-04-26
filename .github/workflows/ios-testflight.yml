@@ -1,0 +1,187 @@
+name: iOS TestFlight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/masroofi-mobile/**'
+      - 'services/hisab-mobile/**'
+      - 'services/bd-online-mobile/**'
+      - 'services/sadad-mobile/**'
+      - 'services/salalah-mobile/**'
+      - 'services/ob-sandbox-app/**'
+      - '.github/workflows/ios-testflight.yml'
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'App to build (or "all")'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - masroofi-mobile
+          - hisab-mobile
+          - bd-online-mobile
+          - sadad-mobile
+          - salalah-mobile
+          - ob-sandbox-app
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: set-matrix
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.app }}" == "all" ]]; then
+              echo 'matrix=["masroofi-mobile","hisab-mobile","bd-online-mobile","sadad-mobile","salalah-mobile","ob-sandbox-app"]' >> "$GITHUB_OUTPUT"
+            else
+              echo 'matrix=["${{ inputs.app }}"]' >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          ALL='["masroofi-mobile","hisab-mobile","bd-online-mobile","sadad-mobile","salalah-mobile","ob-sandbox-app"]'
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+
+          if echo "$CHANGED" | grep -q ".github/workflows/ios-testflight.yml"; then
+            echo "matrix=$ALL" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          APPS=()
+          for app in masroofi-mobile hisab-mobile bd-online-mobile sadad-mobile salalah-mobile ob-sandbox-app; do
+            if echo "$CHANGED" | grep -q "services/${app}/"; then
+              APPS+=("\"${app}\"")
+            fi
+          done
+
+          if [[ ${#APPS[@]} -eq 0 ]]; then
+            echo 'matrix=[]' >> "$GITHUB_OUTPUT"
+          else
+            JOINED=$(IFS=,; echo "${APPS[*]}")
+            echo "matrix=[${JOINED}]" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.matrix != '[]'
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    env:
+      APP_DIR: services/${{ matrix.app }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          cd "$APP_DIR"
+          npm install --legacy-peer-deps
+
+      - name: Generate native iOS project
+        run: |
+          cd "$APP_DIR"
+          npx expo prebuild --platform ios --no-install --clean
+
+      - name: Install CocoaPods
+        run: |
+          cd "$APP_DIR/ios"
+          pod install
+
+      - name: Decode App Store Connect API key
+        run: |
+          mkdir -p ~/private_keys
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 -d > ~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+
+      - name: Read app config
+        id: app-config
+        run: |
+          cd "$APP_DIR"
+          BUNDLE_ID=$(python3 -c "import json; d=json.load(open('app.json')); print(d['expo']['ios']['bundleIdentifier'])")
+          APP_NAME=$(python3 -c "import json; d=json.load(open('app.json')); print(d['expo']['name'])")
+          SCHEME=$(python3 -c "import json; d=json.load(open('app.json')); n=d['expo']['name']; print(n.replace(' ', ''))")
+          echo "bundle_id=$BUNDLE_ID" >> "$GITHUB_OUTPUT"
+          echo "app_name=$APP_NAME" >> "$GITHUB_OUTPUT"
+          echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
+
+      - name: Build and archive
+        run: |
+          cd "$APP_DIR/ios"
+
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${{ steps.app-config.outputs.scheme }}"
+
+          xcodebuild archive \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -destination "generic/platform=iOS" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
+            | xcbeautify || true
+
+      - name: Export IPA
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+      - name: Upload to TestFlight
+        run: |
+          IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)
+          echo "Uploading $IPA to TestFlight..."
+          xcrun altool --upload-app \
+            --file "$IPA" \
+            --type ios \
+            --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            --apiIssuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.app }}-ipa
+          path: ${{ runner.temp }}/export/*.ipa
+          retention-days: 30

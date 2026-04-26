@@ -27,6 +27,7 @@ import ProductArtwork from '../../../components/ProductArtwork';
 import ScreenHeader from '../../../components/ScreenHeader';
 import PrimaryButton from '../../../components/PrimaryButton';
 import { createPaymentIntent } from '../../../utils/payment';
+import { createPaymentConsent, openBankConsent } from '../../../utils/consent';
 
 type PayMethod = 'bdpay' | 'card';
 
@@ -61,7 +62,7 @@ export default function CheckoutScreen() {
     );
   }
 
-  const handlePay = () => {
+  const handlePay = async () => {
     if (!fullName.trim() || !phone.trim() || !address.trim()) {
       Alert.alert('Missing details', 'Please fill in name, phone, and address.');
       return;
@@ -69,14 +70,22 @@ export default function CheckoutScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setSubmitting(true);
     const intent = createPaymentIntent(totals.total);
-    // Simulate Sadad → BD Online deep-link bounce
-    setTimeout(() => {
-      setSubmitting(false);
-      router.replace({
-        pathname: '/checkout/success',
-        params: { ref: intent.merchantRef, total: String(intent.amount) },
+    try {
+      const consent = await createPaymentConsent({
+        amount: intent.amount,
+        currency: intent.currency,
+        merchantRef: intent.merchantRef,
+        merchantName: 'Salalah Souq',
       });
-    }, 900);
+      await openBankConsent(consent.consent_id);
+    } catch (err) {
+      Alert.alert(
+        'Payment error',
+        err instanceof Error ? err.message : 'Could not initiate Bank Dhofar payment',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

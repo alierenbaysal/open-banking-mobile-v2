@@ -11,3 +11,5 @@ dist/
 .DS_Store
 *.swp
 *.swo
+*.p8
+credentials/
