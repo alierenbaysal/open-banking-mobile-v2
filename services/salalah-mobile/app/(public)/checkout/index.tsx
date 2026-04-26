@@ -27,7 +27,7 @@ import ProductArtwork from '../../../components/ProductArtwork';
 import ScreenHeader from '../../../components/ScreenHeader';
 import PrimaryButton from '../../../components/PrimaryButton';
 import { createPaymentIntent } from '../../../utils/payment';
-import { storePendingConsent } from '../../../utils/consent';
+import { openBankConsent } from '../../../utils/consent';
 
 type PayMethod = 'bdpay' | 'card';
 
@@ -69,13 +69,17 @@ export default function CheckoutScreen() {
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setSubmitting(true);
-    const intent = createPaymentIntent(totals.total);
-    await storePendingConsent();
-    router.push({
-      pathname: '/checkout/callback',
-      params: { ref: intent.merchantRef, total: totals.total.toFixed(3) },
-    });
-    setSubmitting(false);
+    try {
+      const intent = createPaymentIntent(totals.total);
+      await openBankConsent(intent.merchantRef, totals.total.toFixed(3));
+    } catch {
+      Alert.alert(
+        'Cannot open Bank Dhofar',
+        'Make sure BD Online is installed on this device.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

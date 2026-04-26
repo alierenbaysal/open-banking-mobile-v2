@@ -6,89 +6,93 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getPendingConsentId } from '../../../utils/consent';
+import { getStoredPaymentState, clearPaymentState } from '../../../utils/consent';
 import { formatMerchantRef } from '../../../utils/payment';
 import { theme } from '../../../utils/theme';
 
-type Phase = 'connecting' | 'authorizing' | 'approved';
+type Phase = 'processing' | 'approved' | 'error';
 
 export default function CheckoutCallbackScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
+    code?: string;
+    state?: string;
+    error?: string;
+    fromBank?: string;
     ref?: string;
     total?: string;
-    fromBank?: string;
   }>();
-  const [phase, setPhase] = useState<Phase>(
-    params.fromBank ? 'authorizing' : 'connecting',
-  );
+  const [phase, setPhase] = useState<Phase>('processing');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [payRef, setPayRef] = useState('');
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
-      if (!params.fromBank) {
-        await new Promise((r) => setTimeout(r, 1200));
-        if (cancelled) return;
-        setPhase('authorizing');
+      const stored = await getStoredPaymentState();
+      const ref = stored.ref || params.ref || 'BD-PAY';
+      const total = stored.total || params.total || '0';
+      setPayRef(ref);
+
+      if (params.error) {
+        setErrorMsg('Payment was declined by Bank Dhofar.');
+        setPhase('error');
+        await clearPaymentState();
+        return;
+      }
+
+      if (params.state && stored.state && params.state !== stored.state) {
+        setErrorMsg('Security validation failed. Please try again.');
+        setPhase('error');
+        await clearPaymentState();
+        return;
       }
 
       await new Promise((r) => setTimeout(r, 1400));
       if (cancelled) return;
-      setPhase('approved');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
-      const consentId = await getPendingConsentId();
+      setPhase('approved');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
+      await clearPaymentState();
 
       await new Promise((r) => setTimeout(r, 1500));
       if (cancelled) return;
+
       router.replace({
         pathname: '/checkout/success',
-        params: {
-          ref: params.ref || consentId || 'BD-PAY',
-          total: params.total || '0',
-        },
+        params: { ref, total },
       });
     };
 
     run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.container}>
       <View style={styles.card}>
-        {phase === 'connecting' && (
+        {phase === 'processing' && (
           <Animated.View entering={FadeIn} style={styles.center}>
-            <LinearGradient colors={['#4D9134', '#2E7D32']} style={styles.iconCircle}>
-              <Ionicons name="business" size={36} color="#FFF" />
-            </LinearGradient>
-            <Text style={styles.title}>Connecting to Bank Dhofar</Text>
-            <Text style={styles.desc}>Opening secure payment channel...</Text>
-            <View style={styles.dots}>
-              <View style={[styles.dot, styles.dotActive]} />
-              <View style={styles.dot} />
-              <View style={styles.dot} />
-            </View>
-          </Animated.View>
-        )}
-
-        {phase === 'authorizing' && (
-          <Animated.View entering={FadeInDown} style={styles.center}>
-            <LinearGradient colors={['#1565C0', '#0D47A1']} style={styles.iconCircle}>
+            <LinearGradient
+              colors={['#1565C0', '#0D47A1']}
+              style={styles.iconCircle}
+            >
               <Ionicons name="shield-checkmark" size={36} color="#FFF" />
             </LinearGradient>
-            <Text style={styles.title}>
-              {params.fromBank ? 'Processing approval' : 'Authorizing payment'}
-            </Text>
+            <Text style={styles.title}>Processing approval</Text>
             <Text style={styles.desc}>
-              {params.fromBank
-                ? 'Bank Dhofar approved — finalizing...'
-                : 'Bank Dhofar is verifying your account...'}
+              Bank Dhofar approved — finalizing payment...
             </Text>
-            {params.ref && (
-              <Text style={styles.refText}>Ref: {formatMerchantRef(params.ref)}</Text>
-            )}
+            {payRef ? (
+              <Text style={styles.refText}>
+                Ref: {formatMerchantRef(payRef)}
+              </Text>
+            ) : null}
             <View style={styles.dots}>
               <View style={[styles.dot, styles.dotDone]} />
               <View style={[styles.dot, styles.dotActive]} />
@@ -99,16 +103,34 @@ export default function CheckoutCallbackScreen() {
 
         {phase === 'approved' && (
           <Animated.View entering={FadeInDown} style={styles.center}>
-            <LinearGradient colors={['#43A047', '#1B5E20']} style={styles.iconCircle}>
+            <LinearGradient
+              colors={['#43A047', '#1B5E20']}
+              style={styles.iconCircle}
+            >
               <Ionicons name="checkmark" size={44} color="#FFF" />
             </LinearGradient>
             <Text style={styles.title}>Payment approved!</Text>
-            <Text style={styles.desc}>Bank Dhofar has confirmed your payment.</Text>
+            <Text style={styles.desc}>
+              Bank Dhofar has confirmed your payment.
+            </Text>
             <View style={styles.dots}>
               <View style={[styles.dot, styles.dotDone]} />
               <View style={[styles.dot, styles.dotDone]} />
               <View style={[styles.dot, styles.dotDone]} />
             </View>
+          </Animated.View>
+        )}
+
+        {phase === 'error' && (
+          <Animated.View entering={FadeInDown} style={styles.center}>
+            <LinearGradient
+              colors={['#C62828', '#B71C1C']}
+              style={styles.iconCircle}
+            >
+              <Ionicons name="close" size={44} color="#FFF" />
+            </LinearGradient>
+            <Text style={styles.title}>Payment failed</Text>
+            <Text style={styles.desc}>{errorMsg}</Text>
           </Animated.View>
         )}
       </View>

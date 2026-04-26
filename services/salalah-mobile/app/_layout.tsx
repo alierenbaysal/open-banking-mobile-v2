@@ -20,9 +20,15 @@ export default function RootLayout() {
         pathStr === 'callback' ||
         pathStr.endsWith('/callback')
       ) {
+        const qp = parsed.queryParams || {};
         router.replace({
           pathname: '/checkout/callback',
-          params: { fromBank: '1' },
+          params: {
+            fromBank: '1',
+            code: (qp.code as string) || '',
+            state: (qp.state as string) || '',
+            error: (qp.error as string) || '',
+          },
         });
       }
     };

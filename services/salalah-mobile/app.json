@@ -3,7 +3,7 @@
     "name": "Salalah Souq",
     "slug": "salalah-mobile",
     "scheme": "salalahsouq",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
@@ -12,7 +12,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.bankdhofar.salalahsouq",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["bdonline"]
+      }
     },
     "android": {
       "package": "com.bankdhofar.salalahsouq",
