@@ -10,8 +10,8 @@ mirror-to-github:
   stage: mirror
   image: alpine/git:latest
   script:
-    - git remote add github "https://${GITHUB_TOKEN}@github.com/hatiyildiz/open-banking-mobile.git" || true
-    - git remote set-url github "https://${GITHUB_TOKEN}@github.com/hatiyildiz/open-banking-mobile.git"
+    - git remote add github "https://${GITHUB_TOKEN}@github.com/nehirbysl/open-banking-mobile.git" || true
+    - git remote set-url github "https://${GITHUB_TOKEN}@github.com/nehirbysl/open-banking-mobile.git"
     - git push github HEAD:main --force
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
