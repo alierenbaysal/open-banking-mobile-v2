@@ -112,3 +112,76 @@ export async function clearPaymentState(): Promise<void> {
     CONSENT_ID_KEY,
   ]);
 }
+
+export async function exchangeCodeAndPay(code: string): Promise<{
+  paymentId: string;
+  status: string;
+}> {
+  const stored = await getStoredPaymentState();
+  if (!stored.consentId) {
+    throw new Error("No pending consent");
+  }
+
+  // Step 1: Exchange authorization code for access token
+  const tokenResp = await fetch(`${API_BASE}/api/auth-codes/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      code,
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_ID,
+    }),
+  });
+
+  if (!tokenResp.ok) {
+    const text = await tokenResp.text().catch(() => "");
+    throw new Error(`Token exchange failed: ${tokenResp.status} ${text}`);
+  }
+
+  const tokenData = await tokenResp.json();
+  const accessToken = tokenData.access_token;
+
+  // Step 2: Submit the domestic payment via PISP endpoint
+  const payResp = await fetch(
+    `${API_BASE}/open-banking/v4.0/pisp/domestic-payments`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        Data: {
+          ConsentId: stored.consentId,
+          Initiation: {
+            InstructionIdentification: `INST-${Date.now()}`,
+            InstructedAmount: {
+              Amount: stored.total || "0",
+              Currency: "OMR",
+            },
+            CreditorAccount: {
+              SchemeName: "IBAN",
+              Identification: "OM12BDOF0000000SALALAHSOUQ",
+              Name: "Salalah Souq",
+            },
+            RemittanceInformation: {
+              Reference: stored.ref || "SLH-PAYMENT",
+            },
+          },
+        },
+        Risk: {},
+      }),
+    },
+  );
+
+  if (!payResp.ok) {
+    const text = await payResp.text().catch(() => "");
+    throw new Error(`Payment submission failed: ${payResp.status} ${text}`);
+  }
+
+  const payData = await payResp.json();
+  return {
+    paymentId: payData.Data?.DomesticPaymentId || "",
+    status: payData.Data?.Status || "AcceptedSettlementInProcess",
+  };
+}

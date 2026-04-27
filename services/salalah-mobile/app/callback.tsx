@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getStoredPaymentState, clearPaymentState } from '../utils/consent';
+import { getStoredPaymentState, clearPaymentState, exchangeCodeAndPay } from '../utils/consent';
 import { formatMerchantRef } from '../utils/payment';
 import { formatOMR } from '../utils/format';
 import { useCart } from '../utils/cart';
@@ -51,15 +51,30 @@ export default function DeepLinkCallbackScreen() {
         return;
       }
 
-      await new Promise((r) => setTimeout(r, 1400));
-      if (cancelled) return;
+      if (!params.code) {
+        setErrorMsg('No authorization code received.');
+        setPhase('error');
+        await clearPaymentState();
+        return;
+      }
 
-      setPhase('approved');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-        () => {},
-      );
-      await clearPaymentState();
-      clearCart();
+      try {
+        const result = await exchangeCodeAndPay(params.code);
+        if (cancelled) return;
+
+        setPhase('approved');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+          () => {},
+        );
+        await clearPaymentState();
+        clearCart();
+      } catch (e: any) {
+        if (cancelled) return;
+        setErrorMsg(e?.message || 'Payment execution failed.');
+        setPhase('error');
+        await clearPaymentState();
+        return;
+      }
     };
 
     run();

@@ -574,6 +574,51 @@ class MockAdapter(OBIEAdapter):
         if consent_id in self._payment_consents:
             self._payment_consents[consent_id]["Status"] = "Consumed"
             self._payment_consents[consent_id]["StatusUpdateDateTime"] = now
+
+        # Execute the actual transfer via consent service
+        try:
+            consent_data = await self._get_consent(consent_id)
+            if consent_data:
+                pd = consent_data.get("payment_details") or {}
+                amt = pd.get("instructed_amount", {})
+                creditor = pd.get("creditor_account", {})
+                selected = consent_data.get("selected_accounts") or []
+                customer_id = consent_data.get("customer_id", "")
+                source_account = selected[0] if selected else ""
+                target_iban = creditor.get("identification", "")
+
+                if source_account and target_iban and customer_id:
+                    # Resolve target account_id from IBAN
+                    target_account = target_iban
+                    try:
+                        accts = await self._banking_get("/accounts", {"customer_id": "ALL"})
+                        for a in (accts if isinstance(accts, list) else []):
+                            if a.get("iban") == target_iban:
+                                target_account = a.get("account_id", target_iban)
+                                break
+                    except Exception:
+                        pass
+
+                    ref = (pd.get("remittance_information") or {}).get("reference", payment_id[:16])
+                    transfer_body = {
+                        "customer_id": customer_id,
+                        "source_account_id": source_account,
+                        "target_account_id": target_account,
+                        "amount": float(amt.get("amount", 0)),
+                        "currency": amt.get("currency", "OMR"),
+                        "reference": ref,
+                    }
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        tr = await client.post(f"{_BANKING_BASE}/transfers", json=transfer_body)
+                        if tr.status_code == 201:
+                            payment["Status"] = "AcceptedSettlementCompleted"
+                            payment["StatusUpdateDateTime"] = _now()
+                            logger.info("Transfer executed for payment %s", payment_id)
+                        else:
+                            logger.warning("Transfer failed for payment %s: %s", payment_id, tr.text)
+        except Exception as exc:
+            logger.warning("Transfer execution error for payment %s: %s", payment_id, exc)
+
         return {
             "Data": payment,
             "Risk": data.get("Risk", {}),
