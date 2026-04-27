@@ -619,9 +619,19 @@ class MockAdapter(OBIEAdapter):
                             payment["StatusUpdateDateTime"] = _now()
                             logger.info("Transfer executed for payment %s", payment_id)
                         else:
-                            logger.warning("Transfer failed for payment %s: %s", payment_id, tr.text)
+                            payment["Status"] = "Rejected"
+                            payment["StatusUpdateDateTime"] = _now()
+                            logger.error("Transfer FAILED for payment %s: %s", payment_id, tr.text)
+                            raise ValueError(f"Bank transfer failed: {tr.text}")
+                else:
+                    payment["Status"] = "Rejected"
+                    logger.error("Missing transfer params: source=%s iban=%s customer=%s", source_account, target_iban, customer_id)
+                    raise ValueError("Missing source account, target IBAN, or customer ID")
         except Exception as exc:
-            logger.warning("Transfer execution error for payment %s: %s", payment_id, exc)
+            payment["Status"] = "Rejected"
+            payment["StatusUpdateDateTime"] = _now()
+            logger.error("Transfer execution error for payment %s: %s", payment_id, exc)
+            raise
 
         return {
             "Data": payment,
