@@ -101,6 +101,14 @@ jobs:
       - name: Install CocoaPods
         run: |
           cd "$APP_DIR/ios"
+          # Force source build so patch-package patches to RCTTurboModule.mm are compiled
+          python3 -c "
+          import json, os
+          pf = 'Podfile.properties.json'
+          props = json.load(open(pf)) if os.path.exists(pf) else {}
+          props['ios.buildReactNativeFromSource'] = 'true'
+          json.dump(props, open(pf, 'w'), indent=2)
+          "
           pod install
 
       - name: Decode App Store Connect API key
