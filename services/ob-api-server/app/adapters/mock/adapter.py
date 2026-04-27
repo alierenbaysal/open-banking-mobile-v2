@@ -587,21 +587,34 @@ class MockAdapter(OBIEAdapter):
                 source_account = selected[0] if selected else ""
                 target_iban = creditor.get("identification", "")
 
-                if source_account and target_iban and customer_id:
-                    # Resolve target account_id from IBAN by querying all known merchant accounts
+                tpp_id = consent_data.get("tpp_id", "")
+
+                if source_account and customer_id:
                     target_account = None
-                    try:
-                        async with httpx.AsyncClient(timeout=5.0) as c2:
-                            r = await c2.get(
-                                f"{settings.consent_service_url}/banking/accounts/by-iban/{target_iban}"
-                            )
-                            if r.status_code == 200:
-                                target_account = r.json().get("account_id")
-                    except Exception:
-                        pass
+                    # Try IBAN lookup first
+                    if target_iban:
+                        try:
+                            async with httpx.AsyncClient(timeout=5.0) as c2:
+                                r = await c2.get(
+                                    f"{settings.consent_service_url}/banking/accounts/by-iban/{target_iban}"
+                                )
+                                if r.status_code == 200:
+                                    target_account = r.json().get("account_id")
+                        except Exception:
+                            pass
+                    # Fallback: resolve by TPP merchant mapping
                     if not target_account:
-                        logger.warning("Could not resolve IBAN %s to account_id", target_iban)
-                        target_account = target_iban
+                        _TPP_MERCHANT_ACCOUNTS = {
+                            "salalah-souq-demo": "DHOF-20001",
+                            "masroofi-demo": "DHOF-20002",
+                            "hisab-demo": "DHOF-20003",
+                        }
+                        target_account = _TPP_MERCHANT_ACCOUNTS.get(tpp_id)
+                        if target_account:
+                            logger.info("Resolved TPP %s to merchant account %s via fallback map", tpp_id, target_account)
+                        else:
+                            logger.error("Could not resolve IBAN %s or TPP %s to any account", target_iban, tpp_id)
+                            raise ValueError(f"Cannot resolve merchant account for TPP {tpp_id}")
 
                     ref = (pd.get("remittance_information") or {}).get("reference", payment_id[:16])
                     transfer_body = {
