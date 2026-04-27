@@ -588,16 +588,20 @@ class MockAdapter(OBIEAdapter):
                 target_iban = creditor.get("identification", "")
 
                 if source_account and target_iban and customer_id:
-                    # Resolve target account_id from IBAN
-                    target_account = target_iban
+                    # Resolve target account_id from IBAN by querying all known merchant accounts
+                    target_account = None
                     try:
-                        accts = await self._banking_get("/accounts", {"customer_id": "ALL"})
-                        for a in (accts if isinstance(accts, list) else []):
-                            if a.get("iban") == target_iban:
-                                target_account = a.get("account_id", target_iban)
-                                break
+                        async with httpx.AsyncClient(timeout=5.0) as c2:
+                            r = await c2.get(
+                                f"{settings.consent_service_url}/banking/accounts/by-iban/{target_iban}"
+                            )
+                            if r.status_code == 200:
+                                target_account = r.json().get("account_id")
                     except Exception:
                         pass
+                    if not target_account:
+                        logger.warning("Could not resolve IBAN %s to account_id", target_iban)
+                        target_account = target_iban
 
                     ref = (pd.get("remittance_information") or {}).get("reference", payment_id[:16])
                     transfer_body = {

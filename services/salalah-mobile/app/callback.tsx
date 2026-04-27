@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,8 +26,11 @@ export default function DeepLinkCallbackScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [payRef, setPayRef] = useState('');
   const [payTotal, setPayTotal] = useState('0');
+  const didRun = useRef(false);
 
   useEffect(() => {
+    if (didRun.current) return;
+    didRun.current = true;
     let cancelled = false;
 
     const run = async () => {

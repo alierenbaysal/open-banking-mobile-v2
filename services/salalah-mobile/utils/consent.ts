@@ -33,7 +33,7 @@ async function createPaymentConsent(
         instructed_amount: { amount, currency: "OMR" },
         creditor_account: {
           scheme_name: "IBAN",
-          identification: "OM12BDOF0000000SALALAHSOUQ",
+          identification: "OM02DHOF0001020099887701",
           name: "Salalah Souq",
         },
         remittance_information: {
@@ -161,7 +161,7 @@ export async function exchangeCodeAndPay(code: string): Promise<{
             },
             CreditorAccount: {
               SchemeName: "IBAN",
-              Identification: "OM12BDOF0000000SALALAHSOUQ",
+              Identification: "OM02DHOF0001020099887701",
               Name: "Salalah Souq",
             },
             RemittanceInformation: {

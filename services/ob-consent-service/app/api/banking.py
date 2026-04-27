@@ -288,6 +288,22 @@ async def get_accounts_by_ids(ids: str = Query(..., description="Comma-separated
     return [_row_to_dict(r) for r in rows]
 
 
+@router.get("/accounts/by-iban/{iban}")
+async def get_account_by_iban(iban: str) -> dict[str, Any]:
+    """Look up an account by IBAN."""
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT a.*, c.first_name, c.last_name, c.first_name_ar, c.last_name_ar
+               FROM accounts a
+               JOIN customers c ON c.customer_id = a.customer_id
+               WHERE a.iban = $1""",
+            iban,
+        )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Account with IBAN {iban} not found")
+    return _row_to_dict(row)
+
+
 @router.get("/accounts/{account_id}")
 async def get_account(account_id: str) -> dict[str, Any]:
     """Get a single account."""
