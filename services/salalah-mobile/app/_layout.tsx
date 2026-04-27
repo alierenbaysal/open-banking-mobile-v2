@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -8,9 +8,11 @@ import { theme } from '../utils/theme';
 
 export default function RootLayout() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   useEffect(() => {
-    const handle = (event: { url: string }) => {
+    const sub = Linking.addEventListener('url', (event) => {
       const { url } = event;
       if (!url) return;
       const parsed = Linking.parse(url);
@@ -21,25 +23,18 @@ export default function RootLayout() {
         pathStr.endsWith('/callback')
       ) {
         const qp = parsed.queryParams || {};
-        router.replace({
-          pathname: '/checkout/callback',
+        routerRef.current.replace({
+          pathname: '/callback',
           params: {
-            fromBank: '1',
             code: (qp.code as string) || '',
             state: (qp.state as string) || '',
             error: (qp.error as string) || '',
           },
         });
       }
-    };
-
-    Linking.getInitialURL().then((initial) => {
-      if (initial) handle({ url: initial });
     });
-
-    const sub = Linking.addEventListener('url', handle);
     return () => sub.remove();
-  }, [router]);
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
