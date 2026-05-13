@@ -411,20 +411,5 @@ func (c *Client) UploadClientCertificate(kcClientUUID, pemCert string) error {
 	}
 
 	c.logger.Info("uploaded client certificate to keycloak", "kc_id", kcClientUUID)
-
-	// Enable certificate-bound access tokens now that a cert is present.
-	update := map[string]interface{}{
-		"attributes": map[string]string{
-			"tls.client.certificate.bound.access.tokens": "true",
-		},
-	}
-	resp2, err := c.doRequest(http.MethodPut, fmt.Sprintf("/clients/%s", kcClientUUID), update)
-	if err != nil {
-		c.logger.Warn("failed to enable mTLS HoK after cert upload", "kc_id", kcClientUUID, "error", err)
-	} else {
-		resp2.Body.Close()
-		c.logger.Info("enabled mTLS HoK token binding", "kc_id", kcClientUUID)
-	}
-
 	return nil
 }
