@@ -124,13 +124,24 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Step 2: Create Keycloak client.
+	// Step 2: Create Keycloak client (or reuse existing one).
 	kcID, err := h.kc.CreateClient(req.Name, clientID, req.RedirectURIs, req.Roles)
 	if err != nil {
-		h.logger.Error("keycloak client creation failed", "error", err, "tpp_id", tppID)
-		writeError(w, http.StatusBadGateway, "keycloak_error",
-			"Failed to create Keycloak client: "+err.Error())
-		return
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "409") {
+			h.logger.Info("Keycloak client already exists, looking up", "client_id", clientID)
+			var found bool
+			kcID, found, err = h.kc.FindClientByClientID(clientID)
+			if err != nil || !found {
+				writeError(w, http.StatusBadGateway, "keycloak_error",
+					"Client exists but lookup failed")
+				return
+			}
+		} else {
+			h.logger.Error("keycloak client creation failed", "error", err, "tpp_id", tppID)
+			writeError(w, http.StatusBadGateway, "keycloak_error",
+				"Failed to create Keycloak client: "+err.Error())
+			return
+		}
 	}
 
 	// Step 3: Retrieve the generated client secret.
