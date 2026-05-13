@@ -528,12 +528,24 @@ func (h *Handler) registerWithConsentService(tpp *models.TPP) error {
 
 // SyncFromConsentService loads all TPPs from the consent service and resolves
 // their Keycloak client UUIDs, populating the in-memory store. This is called
-// at startup so pods recover state after restarts.
+// at startup so pods recover state after restarts. Retries a few times to wait
+// for the Istio sidecar proxy to become ready.
 func (h *Handler) SyncFromConsentService() {
-	url := fmt.Sprintf("%s/tpp?status=Active", h.consentServiceURL)
-	resp, err := http.Get(url)
+	var resp *http.Response
+	var err error
+	syncURL := fmt.Sprintf("%s/tpp?status=Active", h.consentServiceURL)
+
+	for attempt := 1; attempt <= 5; attempt++ {
+		time.Sleep(time.Duration(attempt*2) * time.Second)
+		resp, err = http.Get(syncURL)
+		if err == nil {
+			break
+		}
+		h.logger.Warn("startup sync: consent service not ready, retrying",
+			"attempt", attempt, "error", err)
+	}
 	if err != nil {
-		h.logger.Error("startup sync: consent service unreachable", "error", err)
+		h.logger.Error("startup sync: consent service unreachable after retries", "error", err)
 		return
 	}
 	defer resp.Body.Close()
