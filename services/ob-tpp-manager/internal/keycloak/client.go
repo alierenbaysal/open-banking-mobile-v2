@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -372,21 +373,41 @@ func (c *Client) GetSandboxToken(clientID, clientSecret string, scopes []string)
 
 // UploadClientCertificate configures the certificate on the Keycloak client for mTLS.
 func (c *Client) UploadClientCertificate(kcClientUUID, pemCert string) error {
-	payload := map[string]string{
-		"certificate": pemCert,
+	token, err := c.getToken()
+	if err != nil {
+		return err
 	}
 
-	resp, err := c.doRequest(http.MethodPost,
-		fmt.Sprintf("/clients/%s/certificates/jwt.credential/upload-certificate", kcClientUUID),
-		payload)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	_ = writer.WriteField("keystoreFormat", "Certificate PEM")
+	part, err := writer.CreateFormFile("file", "client.crt")
+	if err != nil {
+		return fmt.Errorf("failed to create form file: %w", err)
+	}
+	if _, err := part.Write([]byte(pemCert)); err != nil {
+		return fmt.Errorf("failed to write cert to form: %w", err)
+	}
+	writer.Close()
+
+	reqURL := fmt.Sprintf("%s/admin/realms/%s/clients/%s/certificates/jwt.credential/upload-certificate",
+		c.baseURL, c.realm, kcClientUUID)
+	req, err := http.NewRequest(http.MethodPost, reqURL, &body)
+	if err != nil {
+		return fmt.Errorf("failed to create upload request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to upload certificate to keycloak: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("keycloak certificate upload returned %d: %s", resp.StatusCode, string(body))
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("keycloak certificate upload returned %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	c.logger.Info("uploaded client certificate to keycloak", "kc_id", kcClientUUID)
