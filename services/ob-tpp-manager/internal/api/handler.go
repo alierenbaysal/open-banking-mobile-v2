@@ -465,14 +465,29 @@ func (h *Handler) GenerateSandboxToken(w http.ResponseWriter, r *http.Request) {
 
 // registerWithConsentService creates a TPP entry in the consent service registry.
 func (h *Handler) registerWithConsentService(tpp *models.TPP) error {
+	isAISP := false
+	isPISP := false
+	isCISP := false
+	for _, r := range tpp.Roles {
+		switch r {
+		case models.RoleAISP:
+			isAISP = true
+		case models.RolePISP:
+			isPISP = true
+		case models.RoleCBPII:
+			isCISP = true
+		}
+	}
+
 	payload := map[string]interface{}{
-		"tpp_id":          tpp.ID,
-		"name":            tpp.Name,
-		"client_id":       tpp.ClientID,
-		"roles":           tpp.Roles,
-		"organisation_id": tpp.OrganisationID,
-		"software_id":     tpp.SoftwareID,
-		"status":          string(tpp.Status),
+		"tpp_id":        tpp.ID,
+		"tpp_name":      tpp.Name,
+		"client_id":     tpp.ClientID,
+		"redirect_uris": tpp.RedirectURIs,
+		"is_aisp":       isAISP,
+		"is_pisp":       isPISP,
+		"is_cisp":       isCISP,
+		"status":        "Active",
 	}
 
 	body, err := json.Marshal(payload)
