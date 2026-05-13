@@ -111,12 +111,16 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:      now,
 	}
 
-	// Step 1: Register with consent service.
+	// Step 1: Register with consent service (idempotent — skip if already exists).
 	if err := h.registerWithConsentService(tpp); err != nil {
-		h.logger.Error("consent service registration failed", "error", err, "tpp_id", tppID)
-		writeError(w, http.StatusBadGateway, "consent_service_error",
-			"Failed to register with consent service: "+err.Error())
-		return
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "already exists") {
+			h.logger.Info("TPP already registered in consent service, proceeding", "tpp_id", tppID)
+		} else {
+			h.logger.Error("consent service registration failed", "error", err, "tpp_id", tppID)
+			writeError(w, http.StatusBadGateway, "consent_service_error",
+				"Failed to register with consent service: "+err.Error())
+			return
+		}
 	}
 
 	// Step 2: Create Keycloak client.
