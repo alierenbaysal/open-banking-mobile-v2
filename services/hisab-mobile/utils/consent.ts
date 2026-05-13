@@ -1,23 +1,14 @@
-/**
- * Consent + OAuth flow for Hisab mobile.
- *
- * Flow:
- *   1. POST /consents on Qantara -> receive consent_id
- *   2. Open BD Online approval URL in an in-app browser
- *   3. User approves on BD Online; BD Online redirects to `hisab://callback?code=...&state=...`
- *   4. Our deep-link handler exchanges the code at the consent service
- *      (/api/auth-codes/exchange) and stores the access_token + consent_id
- */
-
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
-import { BD_ONLINE_BASE, HISAB_API_BASE } from "./api";
+import { BD_ONLINE_BASE, QANTARA_BASE } from "./api";
 import { deleteSecret, getSecret, setSecret } from "./storage";
 import { updateBankOnBackend } from "./auth";
 
 const CONSENT_KEY = "hisab.consent_id";
 const TOKEN_KEY = "hisab.bank_token";
 const STATE_KEY = "hisab.oauth_state";
+const TPP_TOKEN_KEY = "hisab.tpp_token";
+const TPP_TOKEN_EXPIRY_KEY = "hisab.tpp_token_expiry";
 
 const CLIENT_ID = "hisab-business";
 const CLIENT_SECRET = "hisab-business-secret-tnd";
@@ -41,24 +32,63 @@ export interface ConnectResult {
   error?: string;
 }
 
-/**
- * Create an account-access consent on the Qantara consent service.
- */
-export async function createConsent(): Promise<ConsentCreateResponse> {
-  const response = await fetch(`${HISAB_API_BASE}/consent`, {
+function generateInteractionId(): string {
+  const hex = "0123456789abcdef";
+  let out = "";
+  for (let i = 0; i < 32; i++) {
+    out += hex[Math.floor(Math.random() * 16)];
+    if (i === 7 || i === 11 || i === 15 || i === 19) out += "-";
+  }
+  return out;
+}
+
+async function getTPPAccessToken(): Promise<string> {
+  const cached = await getSecret(TPP_TOKEN_KEY);
+  const expiry = await getSecret(TPP_TOKEN_EXPIRY_KEY);
+  if (cached && expiry && Date.now() < Number(expiry) - 30000) {
+    return cached;
+  }
+
+  const resp = await fetch(`${QANTARA_BASE}/portal-api/tpp/${CLIENT_ID}/sandbox-token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scopes: ["accounts"] }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`TPP token request failed: ${resp.status} ${text}`);
+  }
+
+  const data = await resp.json();
+  await setSecret(TPP_TOKEN_KEY, data.access_token);
+  await setSecret(TPP_TOKEN_EXPIRY_KEY, String(Date.now() + data.expires_in * 1000));
+  return data.access_token;
+}
+
+export async function createConsent(): Promise<ConsentCreateResponse> {
+  const token = await getTPPAccessToken();
+
+  const response = await fetch(`${QANTARA_BASE}/open-banking/v4.0/aisp/account-access-consents`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      "x-fapi-interaction-id": generateInteractionId(),
+      "x-fapi-financial-id": "bankdhofar-sandbox",
+    },
     body: JSON.stringify({
-      consent_type: "account-access",
-      tpp_id: CLIENT_ID,
-      permissions: [
-        "ReadAccountsBasic",
-        "ReadAccountsDetail",
-        "ReadBalances",
-        "ReadTransactionsBasic",
-        "ReadTransactionsDetail",
-      ],
-      expiration_days: 90,
+      Data: {
+        Permissions: [
+          "ReadAccountsBasic",
+          "ReadAccountsDetail",
+          "ReadBalances",
+          "ReadTransactionsBasic",
+          "ReadTransactionsDetail",
+        ],
+        ExpirationDateTime: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      Risk: {},
     }),
   });
 
@@ -67,7 +97,12 @@ export async function createConsent(): Promise<ConsentCreateResponse> {
     throw new Error(`Failed to create consent: ${response.status} ${text}`);
   }
 
-  return (await response.json()) as ConsentCreateResponse;
+  const obie = await response.json();
+  return {
+    consent_id: obie.Data?.ConsentId || obie.consent_id,
+    status: obie.Data?.Status || obie.status,
+    created_at: obie.Data?.CreationDateTime || obie.created_at,
+  };
 }
 
 function generateState(): string {
@@ -98,7 +133,7 @@ export async function buildConsentRedirectUrl(consentId: string): Promise<string
  * Exchange an authorization code for an access token.
  */
 export async function exchangeAuthCode(code: string): Promise<ExchangeResponse> {
-  const response = await fetch(`${HISAB_API_BASE}/auth-codes/exchange`, {
+  const response = await fetch(`${QANTARA_BASE}/banking/auth-codes/exchange`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

@@ -1,0 +1,4 @@
+# Private keys must not be committed
+# (ca.key is an exception for sandbox — it IS committed intentionally)
+*.key
+!ca.key

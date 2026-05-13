@@ -150,19 +150,29 @@ The Coraza Web Application Firewall runs as a **Wasm plugin** directly inside th
 
 ## Services
 
+### Platform (Bank Dhofar)
+
 | Service | Stack | Purpose |
 |---------|-------|---------|
-| **ob-api-server** | Python/FastAPI | 64 OBIE v4.0 endpoints with pluggable adapter pattern |
+| **ob-api-server** | Python/FastAPI | 64 OBIE v4.0 endpoints, JWT token validation, consent enforcement |
 | **ob-consent-service** | Python/FastAPI | Consent lifecycle, validation, audit trail |
-| **ob-tpp-manager** | Go | TPP registration, Keycloak client provisioning |
+| **ob-tpp-manager** | Go | TPP registration, certificate management, Keycloak provisioning |
 | **ob-event-service** | Python/FastAPI | Event subscriptions, webhook delivery |
-| **ob-portal** | React 18/Mantine | Qantara developer portal — API catalog, sandbox, apps |
-| **ob-sandbox-app** | Expo/React Native | Mock banking app for consent flow testing |
-| **bd-online** | React | BD Online Banking mock storefront |
-| **hisab** | React | Hisab merchant mock storefront |
-| **masroofi** | React | Masroofi merchant mock storefront |
-| **sadad** | React | Sadad merchant mock storefront |
-| **salalah-el** | React | Salalah Electronics merchant mock storefront |
+| **ob-portal** | React 18/Mantine | Qantara developer portal — API catalog, TPP onboarding |
+| **ob-sandbox-app** | Expo/React Native | Bank Dhofar mobile app — customer consent authorization |
+| **bd-online** | React + Expo | Bank Dhofar Online Banking — first-party bank channel |
+
+### Third-Party Providers (External TPPs)
+
+Each TPP authenticates via mTLS client certificate at the DMZ gateway, then Keycloak OAuth2 (FAPI 2.0) for certificate-bound access tokens.
+
+| TPP | Role | Stack | Use Case |
+|-----|------|-------|----------|
+| **Hisab** | AISP | React + Expo | Accounting platform — reads account data |
+| **Masroofi** | AISP | React + Expo | Digital wallet — reads balances and transactions |
+| **Sadad** | PISP | React | Bill payment gateway — initiates domestic payments |
+| **Salalah Electronics** | PISP | React + Expo | E-commerce — initiates payment at checkout |
+| **Muscat Motors** | PISP | React | Automotive dealer — auto loan payment initiation |
 
 ## OBIE API Coverage (64 Endpoints)
 

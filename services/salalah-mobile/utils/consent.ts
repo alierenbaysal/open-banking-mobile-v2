@@ -5,10 +5,12 @@ const STATE_KEY = "salalah_oauth_state";
 const REF_KEY = "salalah_payment_ref";
 const TOTAL_KEY = "salalah_payment_total";
 const CONSENT_ID_KEY = "salalah_pending_consent";
+const TPP_TOKEN_KEY = "salalah_tpp_token";
+const TPP_TOKEN_EXPIRY_KEY = "salalah_tpp_token_expiry";
 
+const QANTARA_BASE = "https://qantara-api.omtd.bankdhofar.com";
 const API_BASE = "https://banking-api.omtd.bankdhofar.com";
-const TPP_ID = "salalah-souq-demo";
-const CLIENT_ID = "salalah-souq-demo";
+const CLIENT_ID = "salalah-souq";
 const REDIRECT_URI = "salalahsouq://callback";
 
 function randomState(): string {
@@ -19,28 +21,71 @@ function randomState(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function generateInteractionId(): string {
+  const hex = "0123456789abcdef";
+  let out = "";
+  for (let i = 0; i < 32; i++) {
+    out += hex[Math.floor(Math.random() * 16)];
+    if (i === 7 || i === 11 || i === 15 || i === 19) out += "-";
+  }
+  return out;
+}
+
+async function getTPPAccessToken(): Promise<string> {
+  const cached = await AsyncStorage.getItem(TPP_TOKEN_KEY);
+  const expiry = await AsyncStorage.getItem(TPP_TOKEN_EXPIRY_KEY);
+  if (cached && expiry && Date.now() < Number(expiry) - 30000) {
+    return cached;
+  }
+
+  const resp = await fetch(`${QANTARA_BASE}/portal-api/tpp/${CLIENT_ID}/sandbox-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scopes: ["payments"] }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`TPP token request failed: ${resp.status} ${text}`);
+  }
+
+  const data = await resp.json();
+  await AsyncStorage.setItem(TPP_TOKEN_KEY, data.access_token);
+  await AsyncStorage.setItem(TPP_TOKEN_EXPIRY_KEY, String(Date.now() + data.expires_in * 1000));
+  return data.access_token;
+}
+
 async function createPaymentConsent(
   amount: string,
   merchantRef: string,
 ): Promise<string> {
-  const resp = await fetch(`${API_BASE}/api/consents`, {
+  const token = await getTPPAccessToken();
+
+  const resp = await fetch(`${QANTARA_BASE}/open-banking/v4.0/pisp/domestic-payment-consents`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      "x-fapi-interaction-id": generateInteractionId(),
+      "x-fapi-financial-id": "bankdhofar-sandbox",
+    },
     body: JSON.stringify({
-      consent_type: "domestic-payment",
-      tpp_id: TPP_ID,
-      payment_details: {
-        instructed_amount: { amount, currency: "OMR" },
-        creditor_account: {
-          scheme_name: "IBAN",
-          identification: "OM02DHOF0001020099887701",
-          name: "Salalah Souq",
-        },
-        remittance_information: {
-          reference: merchantRef,
-          unstructured: "Salalah Souq payment",
+      Data: {
+        Initiation: {
+          InstructionIdentification: `SLHSOUQ-${Date.now()}`,
+          EndToEndIdentification: merchantRef,
+          InstructedAmount: { Amount: amount, Currency: "OMR" },
+          CreditorAccount: {
+            SchemeName: "IBAN",
+            Identification: "OM02DHOF0001020099887701",
+            Name: "Salalah Souq",
+          },
+          RemittanceInformation: {
+            Reference: merchantRef,
+          },
         },
       },
+      Risk: {},
     }),
   });
 
@@ -49,8 +94,8 @@ async function createPaymentConsent(
     throw new Error(`Consent creation failed: ${resp.status} ${text}`);
   }
 
-  const data = await resp.json();
-  return data.consent_id;
+  const obie = await resp.json();
+  return obie.Data?.ConsentId || obie.consent_id;
 }
 
 export async function openBankConsent(

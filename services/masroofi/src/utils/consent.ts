@@ -1,18 +1,6 @@
-/**
- * Consent flow utilities for OBIE account-access consents.
- *
- * Flow:
- * 1. Create consent via consent-service (POST /consents)
- * 2. Redirect user to BD Online for approval
- * 3. BD Online redirects back with authorization code
- * 4. Exchange code for access token (or use consent_id directly for demo)
- */
-
 import { getCurrentUser } from './auth';
 
-const CONSENT_SERVICE_URL = '/api/consent';
 const BD_ONLINE_BASE = 'https://banking.tnd.bankdhofar.com';
-const KEYCLOAK_TOKEN_URL = 'https://keycloak.uat.bankdhofar.com/realms/open-banking/protocol/openid-connect/token';
 const MASROOFI_REDIRECT_URI = 'https://masroofi.tnd.bankdhofar.com/callback';
 const CLIENT_ID = 'masroofi-demo';
 const CLIENT_SECRET = 'masroofi-demo-secret-tnd';
@@ -20,6 +8,8 @@ const CLIENT_SECRET = 'masroofi-demo-secret-tnd';
 const TOKEN_KEY = 'masroofi_bank_token';
 const CONSENT_KEY = 'masroofi_consent_id';
 const STATE_KEY = 'masroofi_oauth_state';
+const TPP_TOKEN_KEY = 'masroofi_tpp_access_token';
+const TPP_TOKEN_EXPIRY_KEY = 'masroofi_tpp_token_expiry';
 
 export interface ConsentResponse {
   consent_id: string;
@@ -27,24 +17,70 @@ export interface ConsentResponse {
   created_at: string;
 }
 
-/**
- * Create an account-access consent via the consent service.
- */
-export async function createConsent(): Promise<ConsentResponse> {
-  const response = await fetch(CONSENT_SERVICE_URL, {
+interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+}
+
+async function getTPPAccessToken(): Promise<string> {
+  const cached = localStorage.getItem(TPP_TOKEN_KEY);
+  const expiry = localStorage.getItem(TPP_TOKEN_EXPIRY_KEY);
+  if (cached && expiry && Date.now() < Number(expiry) - 30000) {
+    return cached;
+  }
+
+  const response = await fetch('/api/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scopes: ['accounts'] }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`TPP token request failed: ${response.status} ${text}`);
+  }
+
+  const data: TokenResponse = await response.json();
+  localStorage.setItem(TPP_TOKEN_KEY, data.access_token);
+  localStorage.setItem(TPP_TOKEN_EXPIRY_KEY, String(Date.now() + data.expires_in * 1000));
+  return data.access_token;
+}
+
+function generateInteractionId(): string {
+  const hex = '0123456789abcdef';
+  let out = '';
+  for (let i = 0; i < 32; i++) {
+    out += hex[Math.floor(Math.random() * 16)];
+    if (i === 7 || i === 11 || i === 15 || i === 19) out += '-';
+  }
+  return out;
+}
+
+export async function createConsent(): Promise<ConsentResponse> {
+  const token = await getTPPAccessToken();
+
+  const response = await fetch('/open-banking/v4.0/aisp/account-access-consents', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'x-fapi-interaction-id': generateInteractionId(),
+      'x-fapi-financial-id': 'bankdhofar-sandbox',
+    },
     body: JSON.stringify({
-      consent_type: 'account-access',
-      tpp_id: CLIENT_ID,
-      permissions: [
-        'ReadAccountsBasic',
-        'ReadAccountsDetail',
-        'ReadBalances',
-        'ReadTransactionsBasic',
-        'ReadTransactionsDetail',
-      ],
-      expiration_days: 90,
+      Data: {
+        Permissions: [
+          'ReadAccountsBasic',
+          'ReadAccountsDetail',
+          'ReadBalances',
+          'ReadTransactionsBasic',
+          'ReadTransactionsDetail',
+        ],
+        ExpirationDateTime: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      Risk: {},
     }),
   });
 
@@ -53,21 +89,20 @@ export async function createConsent(): Promise<ConsentResponse> {
     throw new Error(`Failed to create consent: ${response.status} ${text}`);
   }
 
-  return response.json();
+  const obie = await response.json();
+  return {
+    consent_id: obie.Data?.ConsentId || obie.consent_id,
+    status: obie.Data?.Status || obie.status,
+    created_at: obie.Data?.CreationDateTime || obie.created_at,
+  };
 }
 
-/**
- * Generate a random state parameter for CSRF protection.
- */
 function generateState(): string {
   const array = new Uint8Array(24);
   crypto.getRandomValues(array);
   return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/**
- * Build the URL to redirect the user to BD Online for consent approval.
- */
 export function buildConsentRedirectUrl(consentId: string): string {
   const state = generateState();
   localStorage.setItem(STATE_KEY, state);
@@ -82,9 +117,6 @@ export function buildConsentRedirectUrl(consentId: string): string {
   return `${BD_ONLINE_BASE}/consent/approve?${params.toString()}`;
 }
 
-/**
- * Exchange an authorization code for an access token via the consent service auth-codes endpoint.
- */
 export async function exchangeAuthCode(code: string): Promise<{ access_token: string; consent_id: string }> {
   const response = await fetch('/api/auth-codes/exchange', {
     method: 'POST',
@@ -105,33 +137,16 @@ export async function exchangeAuthCode(code: string): Promise<{ access_token: st
   return { access_token: data.access_token, consent_id: data.consent_id };
 }
 
-/**
- * Exchange an authorization code for an access token via Keycloak (legacy).
- * @deprecated Use exchangeAuthCode instead.
- */
-export async function exchangeToken(authCode: string): Promise<string> {
-  const result = await exchangeAuthCode(authCode);
-  return result.access_token;
-}
-
-/**
- * Validate the state parameter from the callback.
- */
 export function validateState(receivedState: string): boolean {
   const stored = localStorage.getItem(STATE_KEY);
   localStorage.removeItem(STATE_KEY);
   return stored === receivedState;
 }
 
-/**
- * Store the access token and consent ID after successful auth.
- * Persists to the DB so bank connection survives cache clears.
- */
 export function storeCredentials(token: string, consentId: string): void {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(CONSENT_KEY, consentId);
 
-  // Persist to DB so bank connection survives browser cache clears
   const user = getCurrentUser();
   if (user) {
     fetch('/api/auth/update-bank', {
@@ -146,36 +161,24 @@ export function storeCredentials(token: string, consentId: string): void {
   }
 }
 
-/**
- * Get the stored access token.
- */
 export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-/**
- * Get the stored consent ID.
- */
 export function getStoredConsentId(): string | null {
   return localStorage.getItem(CONSENT_KEY);
 }
 
-/**
- * Check if a bank connection is active.
- * Bank credentials are restored from DB at login time into localStorage.
- */
 export function isBankConnected(): boolean {
   return getStoredToken() !== null && getStoredConsentId() !== null;
 }
 
-/**
- * Disconnect bank (clear stored credentials from localStorage and DB).
- */
 export function disconnectBank(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(CONSENT_KEY);
+  localStorage.removeItem(TPP_TOKEN_KEY);
+  localStorage.removeItem(TPP_TOKEN_EXPIRY_KEY);
 
-  // Clear from DB as well
   const user = getCurrentUser();
   if (user) {
     fetch('/api/auth/update-bank', {

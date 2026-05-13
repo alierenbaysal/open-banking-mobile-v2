@@ -1,21 +1,50 @@
-/**
- * Payment flow utilities for Salalah Souq.
- *
- * Salalah Souq is a MERCHANT that uses Sadad as its payment gateway.
- * Sadad handles the OBIE PISP flow via Bank Dhofar Open Banking.
- *
- * Flow:
- * 1. Customer checks out at Salalah Souq
- * 2. Merchant creates domestic-payment consent via consent-service (POST /consents)
- * 3. Customer is redirected to BD Online for payment approval
- * 4. BD Online executes payment on approval, redirects back to Salalah Souq
- * 5. Salalah Souq shows payment receipt
- */
-
-const CONSENT_SERVICE_URL = '/api/consent';
 const BD_ONLINE_BASE = 'https://banking.tnd.bankdhofar.com';
 const SE_REDIRECT_URI = 'https://salalah.tnd.bankdhofar.com/payment/callback';
-const CLIENT_ID = 'sadad-payment-gateway';
+const CLIENT_ID = 'salalah-souq';
+
+const TPP_TOKEN_KEY = 'ss_tpp_access_token';
+const TPP_TOKEN_EXPIRY_KEY = 'ss_tpp_token_expiry';
+
+interface OAuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+}
+
+async function getTPPAccessToken(): Promise<string> {
+  const cached = localStorage.getItem(TPP_TOKEN_KEY);
+  const expiry = localStorage.getItem(TPP_TOKEN_EXPIRY_KEY);
+  if (cached && expiry && Date.now() < Number(expiry) - 30000) {
+    return cached;
+  }
+
+  const response = await fetch('/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scopes: ['payments'] }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`TPP token request failed: ${response.status} ${text}`);
+  }
+
+  const data: OAuthTokenResponse = await response.json();
+  localStorage.setItem(TPP_TOKEN_KEY, data.access_token);
+  localStorage.setItem(TPP_TOKEN_EXPIRY_KEY, String(Date.now() + data.expires_in * 1000));
+  return data.access_token;
+}
+
+function generateInteractionId(): string {
+  const hex = '0123456789abcdef';
+  let out = '';
+  for (let i = 0; i < 32; i++) {
+    out += hex[Math.floor(Math.random() * 16)];
+    if (i === 7 || i === 11 || i === 15 || i === 19) out += '-';
+  }
+  return out;
+}
 
 const STATE_KEY = 'ss_payment_state';
 const CONSENT_KEY = 'ss_consent_id';
@@ -51,31 +80,40 @@ function generateState(): string {
   return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/**
- * Create a domestic-payment consent via the consent service.
- */
 export async function createPaymentConsent(
   amount: number,
   reference: string
 ): Promise<ConsentResponse> {
-  const response = await fetch(CONSENT_SERVICE_URL, {
+  const token = await getTPPAccessToken();
+
+  const response = await fetch('/open-banking/v4.0/pisp/domestic-payment-consents', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'x-fapi-interaction-id': generateInteractionId(),
+      'x-fapi-financial-id': 'bankdhofar-sandbox',
+    },
     body: JSON.stringify({
-      consent_type: 'domestic-payment',
-      tpp_id: CLIENT_ID,
-      permissions: [],
-      payment_details: {
-        instructed_amount: {
-          amount: amount.toFixed(3),
-          currency: 'OMR',
+      Data: {
+        Initiation: {
+          InstructionIdentification: `SLHSOUQ-${Date.now()}`,
+          EndToEndIdentification: reference,
+          InstructedAmount: {
+            Amount: amount.toFixed(3),
+            Currency: 'OMR',
+          },
+          CreditorAccount: {
+            SchemeName: 'IBAN',
+            Identification: MERCHANT.iban,
+            Name: MERCHANT.name,
+          },
+          RemittanceInformation: {
+            Reference: reference,
+          },
         },
-        creditor_account: {
-          iban: MERCHANT.iban,
-          name: MERCHANT.name,
-        },
-        reference,
       },
+      Risk: {},
     }),
   });
 
@@ -84,7 +122,12 @@ export async function createPaymentConsent(
     throw new Error(`Failed to create payment consent: ${response.status} ${text}`);
   }
 
-  return response.json();
+  const obie = await response.json();
+  return {
+    consent_id: obie.Data?.ConsentId || obie.consent_id,
+    status: obie.Data?.Status || obie.status,
+    created_at: obie.Data?.CreationDateTime || obie.created_at,
+  };
 }
 
 /**
@@ -142,4 +185,6 @@ export function clearPaymentContext(): void {
   localStorage.removeItem(CONSENT_KEY);
   localStorage.removeItem(ORDER_REF_KEY);
   localStorage.removeItem(STATE_KEY);
+  localStorage.removeItem(TPP_TOKEN_KEY);
+  localStorage.removeItem(TPP_TOKEN_EXPIRY_KEY);
 }
