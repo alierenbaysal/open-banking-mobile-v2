@@ -169,17 +169,15 @@ func (c *Client) CreateClient(tppName, clientID string, redirectURIs []string, r
 		WebOrigins:                []string{"+"},
 		DefaultClientScopes:       scopes,
 		Attributes: map[string]string{
-			// FAPI 2.0 profile settings
-			"pkce.code.challenge.method":               "S256",
-			"token.endpoint.auth.signing.alg":          "PS256",
-			"id.token.signed.response.alg":             "PS256",
-			"access.token.signed.response.alg":         "PS256",
-			"tls.client.certificate.bound.access.tokens": "true",
-			"request.object.signature.alg":             "PS256",
-			"require.pushed.authorization.requests":    "true",
-			"use.refresh.tokens":                       "true",
-			"client.session.idle.timeout":              "300",
-			"client.session.max.lifespan":              "3600",
+			"pkce.code.challenge.method":                  "S256",
+			"token.endpoint.auth.signing.alg":             "PS256",
+			"id.token.signed.response.alg":                "PS256",
+			"access.token.signed.response.alg":            "PS256",
+			"tls.client.certificate.bound.access.tokens":  "false",
+			"request.object.signature.alg":                "PS256",
+			"use.refresh.tokens":                          "true",
+			"client.session.idle.timeout":                 "300",
+			"client.session.max.lifespan":                 "3600",
 		},
 	}
 
