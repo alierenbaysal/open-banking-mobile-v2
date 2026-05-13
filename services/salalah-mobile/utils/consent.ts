@@ -10,7 +10,7 @@ const TPP_TOKEN_EXPIRY_KEY = "salalah_tpp_token_expiry";
 
 const QANTARA_BASE = "https://qantara-api.omtd.bankdhofar.com";
 const API_BASE = "https://banking-api.omtd.bankdhofar.com";
-const CLIENT_ID = "salalah-souq";
+const CLIENT_ID = "salalah-souq-demo";
 const REDIRECT_URI = "salalahsouq://callback";
 
 function randomState(): string {

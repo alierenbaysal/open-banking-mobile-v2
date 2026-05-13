@@ -1,6 +1,6 @@
 const BD_ONLINE_BASE = 'https://banking.tnd.bankdhofar.com';
 const SE_REDIRECT_URI = 'https://salalah.tnd.bankdhofar.com/payment/callback';
-const CLIENT_ID = 'salalah-souq';
+const CLIENT_ID = 'salalah-souq-demo';
 
 const TPP_TOKEN_KEY = 'ss_tpp_access_token';
 const TPP_TOKEN_EXPIRY_KEY = 'ss_tpp_token_expiry';
