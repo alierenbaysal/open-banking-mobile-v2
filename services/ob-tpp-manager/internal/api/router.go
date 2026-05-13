@@ -14,6 +14,8 @@ import (
 func NewRouter(kc *keycloak.Client, certMgr *certs.Manager, consentServiceURL string, logger *slog.Logger) http.Handler {
 	h := NewHandler(kc, certMgr, consentServiceURL, logger)
 
+	go h.SyncFromConsentService()
+
 	r := chi.NewRouter()
 
 	// Global middleware stack.

@@ -526,6 +526,83 @@ func (h *Handler) registerWithConsentService(tpp *models.TPP) error {
 	return nil
 }
 
+// SyncFromConsentService loads all TPPs from the consent service and resolves
+// their Keycloak client UUIDs, populating the in-memory store. This is called
+// at startup so pods recover state after restarts.
+func (h *Handler) SyncFromConsentService() {
+	url := fmt.Sprintf("%s/tpp?status=Active", h.consentServiceURL)
+	resp, err := http.Get(url)
+	if err != nil {
+		h.logger.Error("startup sync: consent service unreachable", "error", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		h.logger.Error("startup sync: consent service returned error", "status", resp.StatusCode, "body", string(body))
+		return
+	}
+
+	var tpps []struct {
+		TPPID        string   `json:"tpp_id"`
+		TPPName      string   `json:"tpp_name"`
+		ClientID     string   `json:"client_id"`
+		IsAISP       bool     `json:"is_aisp"`
+		IsPISP       bool     `json:"is_pisp"`
+		IsCISP       bool     `json:"is_cisp"`
+		RedirectURIs []string `json:"redirect_uris"`
+		Status       string   `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tpps); err != nil {
+		h.logger.Error("startup sync: failed to decode consent service response", "error", err)
+		return
+	}
+
+	h.logger.Info("startup sync: loaded TPPs from consent service", "count", len(tpps))
+
+	for _, ct := range tpps {
+		var roles []models.TPPRole
+		if ct.IsAISP {
+			roles = append(roles, models.RoleAISP)
+		}
+		if ct.IsPISP {
+			roles = append(roles, models.RolePISP)
+		}
+		if ct.IsCISP {
+			roles = append(roles, models.RoleCBPII)
+		}
+
+		tpp := &models.TPP{
+			ID:           ct.TPPID,
+			Name:         ct.TPPName,
+			ClientID:     ct.ClientID,
+			RedirectURIs: ct.RedirectURIs,
+			Roles:        roles,
+			Status:       models.StatusActive,
+			CreatedAt:    time.Now().UTC(),
+			UpdatedAt:    time.Now().UTC(),
+		}
+
+		kcID, found, err := h.kc.FindClientByClientID(ct.ClientID)
+		if err != nil {
+			h.logger.Warn("startup sync: keycloak lookup failed", "client_id", ct.ClientID, "error", err)
+			continue
+		}
+		if !found {
+			h.logger.Warn("startup sync: keycloak client not found, skipping", "client_id", ct.ClientID)
+			continue
+		}
+
+		h.mu.Lock()
+		h.tpps[ct.TPPID] = tpp
+		h.kcIDs[ct.ClientID] = kcID
+		h.mu.Unlock()
+
+		h.logger.Info("startup sync: loaded TPP", "tpp_id", ct.TPPID, "client_id", ct.ClientID, "kc_id", kcID)
+	}
+}
+
 // --- JSON helpers ---
 
 func readJSON(r *http.Request, v interface{}) error {
