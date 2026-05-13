@@ -214,6 +214,8 @@ All endpoints use a pluggable adapter pattern. Backend adapters are swapped per-
 ## Documentation
 
 - [High-Level Design](docs/HLD.md)
+- [Fintech Developer Journey](docs/developer-journey.md)
+- [Transport Security — mTLS and TLS Architecture](docs/transport-security.md)
 - [OBIE Coverage Analysis](api-catalog/docs/obie-coverage-analysis.md)
 - [Consent Service Design](api-catalog/docs/consent-service-design.md)
 - [API Mapping (BD → OBIE)](api-catalog/docs/api-mapping-obie.md)
