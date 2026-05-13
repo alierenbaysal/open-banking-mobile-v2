@@ -80,10 +80,21 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate a deterministic client_id from the TPP name.
-	tppID := generateID()
-	clientID := fmt.Sprintf("tpp-%s", tppID)
+	clientID := req.ClientID
+	if clientID == "" {
+		clientID = fmt.Sprintf("tpp-%s", generateID())
+	}
+	tppID := clientID
 	now := time.Now().UTC()
+
+	h.mu.RLock()
+	if _, exists := h.tpps[tppID]; exists {
+		h.mu.RUnlock()
+		writeError(w, http.StatusConflict, "already_exists",
+			fmt.Sprintf("TPP with client_id '%s' is already registered", clientID))
+		return
+	}
+	h.mu.RUnlock()
 
 	tpp := &models.TPP{
 		ID:             tppID,

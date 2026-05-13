@@ -40,6 +40,7 @@ type TPP struct {
 // RegisterRequest is the payload for TPP registration.
 type RegisterRequest struct {
 	Name           string    `json:"name"`
+	ClientID       string    `json:"client_id,omitempty"`
 	Description    string    `json:"description,omitempty"`
 	RedirectURIs   []string  `json:"redirect_uris"`
 	Roles          []TPPRole `json:"roles"`
