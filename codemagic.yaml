@@ -1,0 +1,217 @@
+definitions:
+  environment: &ios_env
+    ios_signing:
+      distribution_type: app_store
+      bundle_identifier: com.bankdhofar.$APP_BUNDLE_SUFFIX
+    vars:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: QNKUND9J28
+      APP_STORE_CONNECT_ISSUER_ID: 34d53368-0c48-4cb8-b531-b4d58b4d41a1
+      APPLE_TEAM_ID: 77GHJHUGD4
+    node: 22
+    xcode: latest
+    cocoapods: default
+
+  scripts:
+    - &install_deps
+      name: Install dependencies
+      script: |
+        cd services/$APP_DIR
+        npm install --legacy-peer-deps
+    - &prebuild
+      name: Generate native iOS project
+      script: |
+        cd services/$APP_DIR
+        npx expo prebuild --platform ios --no-install --clean
+    - &pod_install
+      name: Install CocoaPods
+      script: |
+        cd services/$APP_DIR/ios
+        pod install
+    - &build_ios
+      name: Build iOS
+      script: |
+        cd services/$APP_DIR/ios
+        xcode-project build-ipa \
+          --workspace "*.xcworkspace" \
+          --scheme "$APP_SCHEME" \
+          --config Release
+
+  artifacts: &artifacts
+    - services/$APP_DIR/ios/build/ios/ipa/*.ipa
+    - /tmp/xcodebuild_logs/*.log
+
+  publishing: &publishing
+    app_store_connect:
+      auth: integration
+      submit_to_testflight: true
+      beta_groups:
+        - "Internal Testers"
+
+workflows:
+  masroofi-ios:
+    name: Masroofi iOS
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      <<: *ios_env
+      vars:
+        APP_DIR: masroofi-mobile
+        APP_SCHEME: Masroofi
+        APP_BUNDLE_SUFFIX: masroofi
+        APP_STORE_CONNECT_KEY_IDENTIFIER: QNKUND9J28
+        APP_STORE_CONNECT_ISSUER_ID: 34d53368-0c48-4cb8-b531-b4d58b4d41a1
+        APPLE_TEAM_ID: 77GHJHUGD4
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+      change_patterns:
+        - services/masroofi-mobile/**
+    scripts:
+      - *install_deps
+      - *prebuild
+      - *pod_install
+      - *build_ios
+    artifacts: *artifacts
+    publishing: *publishing
+
+  hisab-ios:
+    name: Hisab iOS
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      <<: *ios_env
+      vars:
+        APP_DIR: hisab-mobile
+        APP_SCHEME: Hisab
+        APP_BUNDLE_SUFFIX: hisab
+        APP_STORE_CONNECT_KEY_IDENTIFIER: QNKUND9J28
+        APP_STORE_CONNECT_ISSUER_ID: 34d53368-0c48-4cb8-b531-b4d58b4d41a1
+        APPLE_TEAM_ID: 77GHJHUGD4
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+      change_patterns:
+        - services/hisab-mobile/**
+    scripts:
+      - *install_deps
+      - *prebuild
+      - *pod_install
+      - *build_ios
+    artifacts: *artifacts
+    publishing: *publishing
+
+  bd-online-ios:
+    name: BD Online iOS
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      <<: *ios_env
+      vars:
+        APP_DIR: bd-online-mobile
+        APP_SCHEME: BankDhofarOnline
+        APP_BUNDLE_SUFFIX: bdonline
+        APP_STORE_CONNECT_KEY_IDENTIFIER: QNKUND9J28
+        APP_STORE_CONNECT_ISSUER_ID: 34d53368-0c48-4cb8-b531-b4d58b4d41a1
+        APPLE_TEAM_ID: 77GHJHUGD4
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+      change_patterns:
+        - services/bd-online-mobile/**
+    scripts:
+      - *install_deps
+      - *prebuild
+      - *pod_install
+      - *build_ios
+    artifacts: *artifacts
+    publishing: *publishing
+
+  sadad-ios:
+    name: Sadad iOS
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      <<: *ios_env
+      vars:
+        APP_DIR: sadad-mobile
+        APP_SCHEME: Sadad
+        APP_BUNDLE_SUFFIX: sadad
+        APP_STORE_CONNECT_KEY_IDENTIFIER: QNKUND9J28
+        APP_STORE_CONNECT_ISSUER_ID: 34d53368-0c48-4cb8-b531-b4d58b4d41a1
+        APPLE_TEAM_ID: 77GHJHUGD4
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+      change_patterns:
+        - services/sadad-mobile/**
+    scripts:
+      - *install_deps
+      - *prebuild
+      - *pod_install
+      - *build_ios
+    artifacts: *artifacts
+    publishing: *publishing
+
+  salalah-ios:
+    name: Salalah Souq iOS
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      <<: *ios_env
+      vars:
+        APP_DIR: salalah-mobile
+        APP_SCHEME: SalalahSouq
+        APP_BUNDLE_SUFFIX: salalahsouq
+        APP_STORE_CONNECT_KEY_IDENTIFIER: QNKUND9J28
+        APP_STORE_CONNECT_ISSUER_ID: 34d53368-0c48-4cb8-b531-b4d58b4d41a1
+        APPLE_TEAM_ID: 77GHJHUGD4
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+      change_patterns:
+        - services/salalah-mobile/**
+    scripts:
+      - *install_deps
+      - *prebuild
+      - *pod_install
+      - *build_ios
+    artifacts: *artifacts
+    publishing: *publishing
+
+  sandbox-ios:
+    name: BD Sandbox iOS
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      <<: *ios_env
+      vars:
+        APP_DIR: ob-sandbox-app
+        APP_SCHEME: BDSandbox
+        APP_BUNDLE_SUFFIX: sandbox
+        APP_STORE_CONNECT_KEY_IDENTIFIER: QNKUND9J28
+        APP_STORE_CONNECT_ISSUER_ID: 34d53368-0c48-4cb8-b531-b4d58b4d41a1
+        APPLE_TEAM_ID: 77GHJHUGD4
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+      change_patterns:
+        - services/ob-sandbox-app/**
+    scripts:
+      - *install_deps
+      - *prebuild
+      - *pod_install
+      - *build_ios
+    artifacts: *artifacts
+    publishing: *publishing
