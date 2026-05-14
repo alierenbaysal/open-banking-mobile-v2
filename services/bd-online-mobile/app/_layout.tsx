@@ -53,7 +53,7 @@ function parseLoanFromUrl(url: string | null | undefined): PendingLoan | null {
   if (!url) return null;
   try {
     const p = Linking.parse(url);
-    if (!p.path?.includes("loan/apply")) return null;
+    if (!p.path?.includes("loan/scan")) return null;
     const qp = p.queryParams || {};
     const a = typeof qp.a === "string" ? qp.a : null;
     const d = typeof qp.d === "string" ? qp.d : "";
@@ -135,7 +135,7 @@ export default function RootLayout() {
 
     const loanAppId = pendingLoan?.application_id;
     const loanDealerId = pendingLoan?.dealer_id || "";
-    const alreadyOnLoan = inAuth && segments[1] === "loan" && segments[2] === "apply";
+    const alreadyOnLoan = inAuth && segments[1] === "loan" && segments[2] === "scan";
 
     if (loanAppId && !alreadyOnLoan) {
       if (!user) {
@@ -145,7 +145,7 @@ export default function RootLayout() {
         });
       } else {
         router.replace({
-          pathname: "/(auth)/loan/apply",
+          pathname: "/(auth)/loan/scan",
           params: { a: loanAppId, d: loanDealerId },
         });
       }

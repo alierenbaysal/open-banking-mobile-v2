@@ -67,7 +67,7 @@ export default function LoginScreen() {
         });
       } else if (hasLoan) {
         router.replace({
-          pathname: "/(auth)/loan/apply",
+          pathname: "/(auth)/loan/scan",
           params: {
             a: params.loan_app_id || "",
             d: params.loan_dealer_id || "",

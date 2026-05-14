@@ -29,7 +29,7 @@ from app.schemas.money import Money
 logger = get_logger(__name__)
 
 def _build_qr_payload(application_id: UUID, dealer_id: str) -> str:
-    return f"bdonline://loan/apply?a={application_id}&d={dealer_id}"
+    return f"bdonline://loan/scan?a={application_id}&d={dealer_id}"
 
 
 def _validate_amounts(req: CreateApplicationRequest) -> None:
