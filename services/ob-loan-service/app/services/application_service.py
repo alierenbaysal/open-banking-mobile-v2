@@ -29,7 +29,7 @@ from app.schemas.money import Money
 logger = get_logger(__name__)
 
 # Public Bank Dhofar URL where customers' BD app deep-links land.
-QR_BASE_URL = "https://banking.tnd.bankdhofar.com"
+QR_BASE_URL = "https://banking-api.omtd.bankdhofar.com"
 
 
 def _build_qr_payload(application_id: UUID, dealer_id: str) -> str:
