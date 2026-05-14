@@ -506,11 +506,44 @@ class MockAdapter(OBIEAdapter):
 
     # ── PIS: Domestic Payment Consents ──────────────────────────────────
 
-    async def create_domestic_payment_consent(self, data: dict[str, Any]) -> dict[str, Any]:
-        consent_id = f"urn:bankdhofar:dpc:{_uuid()}"
-        now = _now()
+    async def create_domestic_payment_consent(self, data: dict[str, Any], *, client_id: str | None = None) -> dict[str, Any]:
         initiation = data.get("Data", {}).get("Initiation", {})
         risk = data.get("Risk", {})
+
+        tpp_id = client_id or "unknown-tpp"
+        amount_info = initiation.get("InstructedAmount", {})
+        payment_details = {
+            "instructed_amount": {
+                "amount": amount_info.get("Amount", "0"),
+                "currency": amount_info.get("Currency", "OMR"),
+            },
+            "creditor_account": initiation.get("CreditorAccount"),
+            "remittance_reference": initiation.get("RemittanceInformation", {}).get("Reference"),
+        }
+
+        consent_id = None
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(
+                    f"{settings.consent_service_url}/consents",
+                    json={
+                        "consent_type": "domestic-payment",
+                        "tpp_id": tpp_id,
+                        "permissions": ["ReadPaymentsBasic", "ReadPaymentsDetail"],
+                        "payment_details": payment_details,
+                        "risk_data": risk or None,
+                    },
+                )
+                if resp.status_code == 201:
+                    cs_data = resp.json()
+                    consent_id = cs_data.get("consent_id")
+        except Exception as exc:
+            logger.warning("Failed to persist payment consent to consent service: %s", exc)
+
+        if not consent_id:
+            consent_id = _uuid()
+
+        now = _now()
         consent = {
             "ConsentId": consent_id,
             "Status": "AwaitingAuthorisation",

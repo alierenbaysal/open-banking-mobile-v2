@@ -16,7 +16,8 @@ router = APIRouter(prefix="/open-banking/v4.0/pisp", tags=["PIS Consents"])
 async def create_domestic_payment_consent(request: Request):
     body = await request.json()
     adapter = get_adapter()
-    result = await adapter.create_domestic_payment_consent(body)
+    client_id = getattr(request.state, "client_id", None)
+    result = await adapter.create_domestic_payment_consent(body, client_id=client_id)
     return JSONResponse(status_code=201, content=result)
 
 
