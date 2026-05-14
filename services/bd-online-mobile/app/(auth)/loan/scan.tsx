@@ -1,9 +1,12 @@
 /**
- * Loan QR scan — dual-mode screen:
+ * Loan scan screen — deep link entry point for auto loan approvals.
  *
- * 1. Deep link mode (params a + d present): fetches loan application details
- *    from ob-loan-service and lets the customer approve → triggers decision.
- * 2. Camera mode (no params): opens camera to scan a dealer QR code.
+ * With params (a + d): fetches loan application details from ob-loan-service
+ * and lets the customer approve → triggers decision engine.
+ *
+ * Without params: shows instructions to scan the dealer's QR with the phone
+ * camera. The QR contains a bdonline:// deep link that opens this screen
+ * with the correct params automatically.
  */
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -16,7 +19,6 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CameraView, useCameraPermissions, BarcodeScanningResult } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -60,8 +62,8 @@ export default function LoanScanScreen() {
     );
   }
 
-  // Camera mode — scan QR
-  return <CameraScanView insets={insets} router={router} />;
+  // No deep link params — show instructions
+  return <ScanInstructionsView insets={insets} router={router} />;
 }
 
 // ─── Deep Link Approval View ──────────────────────────────────────────────
@@ -375,158 +377,115 @@ function LoanApprovalView({
   );
 }
 
-// ─── Camera Scan View (original behaviour) ────────────────────────────────
+// ─── Instructions View (no deep link params) ────────────────────────────────
 
-function CameraScanView({
+function ScanInstructionsView({
   insets,
   router,
 }: {
   insets: { top: number };
   router: ReturnType<typeof useRouter>;
 }) {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (permission && !permission.granted && permission.canAskAgain) {
-      requestPermission();
-    }
-  }, [permission, requestPermission]);
-
-  const handleScan = (result: BarcodeScanningResult) => {
-    if (scanned) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-      () => undefined,
-    );
-    setScanned(result.data);
-  };
-
-  const handleSubmit = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-      () => undefined,
-    );
-    router.replace("/(auth)");
-  };
-
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.camHeaderRow}>
-        <Pressable
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.camBackBtn}
-        >
-          <Ionicons name="close" size={22} color={colors.white} />
-        </Pressable>
-        <Text style={styles.camHeaderTitle}>Scan QR</Text>
-        <View style={{ width: 38 }} />
-      </View>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.md, alignItems: "center" },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={() => router.replace("/(auth)")}
+            style={styles.backBtn}
+            hitSlop={12}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Auto Loan</Text>
+          <View style={{ width: 38 }} />
+        </View>
 
-      <View style={styles.cameraWrap}>
-        {permission?.granted ? (
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={scanned ? undefined : handleScan}
-          />
-        ) : (
-          <View style={styles.permissionWrap}>
-            <Ionicons name="camera-outline" size={48} color={colors.white} />
-            <Text style={styles.permissionTitle}>Camera Access Required</Text>
-            <Text style={styles.permissionText}>
-              Allow camera access to scan QR codes for car loan applications.
-            </Text>
-            <PrimaryButton
-              label="Grant Permission"
-              onPress={() => requestPermission()}
-              variant="filled"
-              size="md"
-              style={{ marginTop: spacing.lg }}
-            />
-          </View>
-        )}
-
-        {permission?.granted && !scanned && (
-          <View pointerEvents="none" style={styles.overlay}>
-            <View style={styles.reticle}>
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
-            </View>
-            <Text style={styles.hint}>
-              Point your camera at the dealer's QR code
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {scanned && (
         <LinearGradient
           colors={gradients.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.scanResult, shadow.hero]}
+          style={[styles.instructionsBanner, shadow.hero]}
         >
-          <View style={styles.resultIconCircle}>
-            <Ionicons name="checkmark-circle" size={28} color={colors.white} />
+          <View style={styles.bannerIconCircle}>
+            <Ionicons name="qr-code-outline" size={32} color={colors.white} />
           </View>
-          <Text style={styles.resultTitle}>QR Detected</Text>
-          <Text style={styles.resultData} numberOfLines={3}>
-            {scanned}
+          <Text style={styles.bannerTitle}>Scan Dealer QR</Text>
+          <Text style={styles.bannerSub}>
+            Use your phone camera to scan the QR code at the dealership
           </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              gap: spacing.md,
-              marginTop: spacing.md,
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <PrimaryButton
-                label="Re-scan"
-                onPress={() => setScanned(null)}
-                variant="outline"
-                fullWidth
-                style={{
-                  borderColor: colors.white,
-                  backgroundColor: "transparent",
-                }}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <PrimaryButton
-                label="Apply for Loan"
-                onPress={handleSubmit}
-                variant="filled"
-                fullWidth
-                style={{ backgroundColor: colors.white }}
-              />
-            </View>
-          </View>
         </LinearGradient>
-      )}
+
+        <Card style={{ marginTop: spacing.lg, width: "100%" }}>
+          <Text style={styles.sectionTitle}>How it works</Text>
+          <View style={{ marginTop: spacing.md, gap: spacing.lg }}>
+            {[
+              {
+                icon: "camera-outline" as const,
+                title: "Open your phone camera",
+                desc: "Use the built-in camera app — no need to open Bank Dhofar first.",
+              },
+              {
+                icon: "scan-outline" as const,
+                title: "Point at the dealer's QR code",
+                desc: "The QR code is displayed on the dealer's screen or printed form.",
+              },
+              {
+                icon: "open-outline" as const,
+                title: "Tap the notification to open",
+                desc: "Your phone will recognize the code and open the loan details here automatically.",
+              },
+            ].map((step, i) => (
+              <View key={step.title} style={styles.stepRow}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>{i + 1}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                    <Ionicons name={step.icon} size={18} color={colors.primary} />
+                    <Text style={styles.stepTitle}>{step.title}</Text>
+                  </View>
+                  <Text style={styles.stepDesc}>{step.desc}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </Card>
+
+        <Card style={{ marginTop: spacing.md, width: "100%" }}>
+          <View style={styles.infoBox}>
+            <Ionicons name="information-circle" size={18} color={colors.info} />
+            <Text style={styles.infoText}>
+              Not at a dealership? Ask your dealer to share the QR code link
+              with you directly.
+            </Text>
+          </View>
+        </Card>
+
+        <View style={{ height: spacing.xxl }} />
+      </ScrollView>
     </View>
   );
 }
 
 // ─── Styles ────────────────────────────────────────────────────────────────
 
-const RETICLE_SIZE = 240;
-const CORNER_LEN = 28;
-const CORNER_WIDTH = 4;
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000" },
+  root: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
-  // ── Approval view styles ──
+  // ── Shared ──
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: spacing.md,
+    width: "100%",
   },
   backBtn: {
     width: 38,
@@ -538,11 +497,6 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   headerTitle: { fontSize: 17, fontWeight: "700", color: colors.text },
-  banner: {
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    alignItems: "center",
-  },
   bannerIconCircle: {
     width: 60,
     height: 60,
@@ -563,6 +517,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
     textAlign: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: "#EFF6FF",
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  infoText: { fontSize: 12, color: colors.info, lineHeight: 18, flex: 1 },
+
+  // ── Approval view ──
+  banner: {
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    alignItems: "center",
   },
   dealerRow: {
     flexDirection: "row",
@@ -580,13 +558,6 @@ const styles = StyleSheet.create({
   },
   dealerName: { fontSize: 17, fontWeight: "700", color: colors.text },
   dealerMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
   vehicleName: {
     fontSize: 17,
     fontWeight: "700",
@@ -619,13 +590,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   checkText: { fontSize: 13, color: colors.text },
-  infoBox: {
-    backgroundColor: "#EFF6FF",
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  infoText: { fontSize: 12, color: colors.info, lineHeight: 18 },
   actionsRow: {
     flexDirection: "row",
     gap: spacing.md,
@@ -658,116 +622,36 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
 
-  // ── Camera view styles ──
-  camHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  camBackBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  camHeaderTitle: { fontSize: 17, fontWeight: "700", color: colors.white },
-  cameraWrap: {
-    flex: 1,
-    overflow: "hidden",
-    backgroundColor: "#111",
-    position: "relative",
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reticle: { width: RETICLE_SIZE, height: RETICLE_SIZE },
-  corner: {
-    position: "absolute",
-    width: CORNER_LEN,
-    height: CORNER_LEN,
-    borderColor: colors.white,
-  },
-  cornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: CORNER_WIDTH,
-    borderLeftWidth: CORNER_WIDTH,
-    borderTopLeftRadius: 8,
-  },
-  cornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: CORNER_WIDTH,
-    borderRightWidth: CORNER_WIDTH,
-    borderTopRightRadius: 8,
-  },
-  cornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: CORNER_WIDTH,
-    borderLeftWidth: CORNER_WIDTH,
-    borderBottomLeftRadius: 8,
-  },
-  cornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: CORNER_WIDTH,
-    borderRightWidth: CORNER_WIDTH,
-    borderBottomRightRadius: 8,
-  },
-  hint: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 13,
-    marginTop: spacing.lg,
-    textAlign: "center",
-    paddingHorizontal: spacing.xl,
-  },
-  permissionWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.xl,
-  },
-  permissionTitle: {
-    color: colors.white,
-    fontSize: 18,
-    fontWeight: "700",
-    marginTop: spacing.md,
-  },
-  permissionText: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 13,
-    marginTop: spacing.sm,
-    textAlign: "center",
-  },
-  scanResult: {
-    margin: spacing.lg,
-    padding: spacing.lg,
+  // ── Instructions view ──
+  instructionsBanner: {
     borderRadius: radius.xl,
+    padding: spacing.xl,
     alignItems: "center",
+    width: "100%",
   },
-  resultIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(255,255,255,0.18)",
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+  },
+  stepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: spacing.sm,
   },
-  resultTitle: { color: colors.white, fontSize: 17, fontWeight: "800" },
-  resultData: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 12,
-    fontFamily: "Courier",
-    textAlign: "center",
-    marginTop: 4,
-    paddingHorizontal: spacing.md,
+  stepNumberText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  stepTitle: { fontSize: 15, fontWeight: "700", color: colors.text },
+  stepDesc: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 2,
+    lineHeight: 18,
   },
 });
