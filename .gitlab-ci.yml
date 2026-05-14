@@ -10,6 +10,8 @@ mirror-to-github:
   stage: mirror
   image: alpine/git:latest
   allow_failure: true
+  variables:
+    GIT_DEPTH: 0
   script:
     - git remote add github "https://${GITHUB_TOKEN}@github.com/alierenbaysal/open-banking-mobile-v2.git" || true
     - git remote set-url github "https://${GITHUB_TOKEN}@github.com/alierenbaysal/open-banking-mobile-v2.git"
