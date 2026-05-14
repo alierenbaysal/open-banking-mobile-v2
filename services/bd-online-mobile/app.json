@@ -3,7 +3,7 @@
     "name": "Bank Dhofar Online",
     "slug": "bd-online-mobile",
     "scheme": "bdonline",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
