@@ -75,8 +75,8 @@ export default function PaymentCallback() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               code,
-              client_id: 'sadad-payment-gateway',
-              client_secret: 'sadad-gateway-secret-tnd',
+              client_id: 'salalah-souq-demo',
+              client_secret: 'salalah-souq-secret-tnd',
             }),
           });
 
