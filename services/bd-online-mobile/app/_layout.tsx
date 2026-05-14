@@ -27,6 +27,11 @@ interface PendingConsent {
   state: string;
 }
 
+interface PendingLoan {
+  application_id: string;
+  dealer_id: string;
+}
+
 function parseConsentFromUrl(url: string | null | undefined): PendingConsent | null {
   if (!url) return null;
   try {
@@ -44,9 +49,25 @@ function parseConsentFromUrl(url: string | null | undefined): PendingConsent | n
   }
 }
 
+function parseLoanFromUrl(url: string | null | undefined): PendingLoan | null {
+  if (!url) return null;
+  try {
+    const p = Linking.parse(url);
+    if (!p.path?.includes("loan/apply")) return null;
+    const qp = p.queryParams || {};
+    const a = typeof qp.a === "string" ? qp.a : null;
+    const d = typeof qp.d === "string" ? qp.d : "";
+    if (!a) return null;
+    return { application_id: a, dealer_id: d };
+  } catch {
+    return null;
+  }
+}
+
 export default function RootLayout() {
   const [user, setUser] = useState<BankUser | null | undefined>(undefined);
   const [pendingConsent, setPendingConsent] = useState<PendingConsent | null>(null);
+  const [pendingLoan, setPendingLoan] = useState<PendingLoan | null>(null);
   const segments = useSegments();
   const router = useRouter();
   const params = useGlobalSearchParams<{
@@ -67,12 +88,16 @@ export default function RootLayout() {
   // parse them ourselves and stash in local state.
   useEffect(() => {
     Linking.getInitialURL().then((url) => {
-      const parsed = parseConsentFromUrl(url);
-      if (parsed) setPendingConsent(parsed);
+      const consent = parseConsentFromUrl(url);
+      if (consent) { setPendingConsent(consent); return; }
+      const loan = parseLoanFromUrl(url);
+      if (loan) setPendingLoan(loan);
     });
     const sub = Linking.addEventListener("url", (ev) => {
-      const parsed = parseConsentFromUrl(ev.url);
-      if (parsed) setPendingConsent(parsed);
+      const consent = parseConsentFromUrl(ev.url);
+      if (consent) { setPendingConsent(consent); return; }
+      const loan = parseLoanFromUrl(ev.url);
+      if (loan) setPendingLoan(loan);
     });
     return () => sub.remove();
   }, []);
@@ -94,22 +119,37 @@ export default function RootLayout() {
 
     if (consentId && !alreadyOnApprove) {
       if (!user) {
-        // Unauthenticated → login, carrying consent params. Login will
-        // redirect to consent/approve after successful sign-in.
         router.replace({
           pathname: "/(public)/login",
           params: { consent_id: consentId, redirect_uri: redirectUri, state },
         });
       } else {
-        // Authenticated → straight to the consent approve screen.
         router.replace({
           pathname: "/(auth)/consent/approve",
           params: { consent_id: consentId, redirect_uri: redirectUri, state },
         });
       }
-      // Clear pending after we hand it off to avoid re-routing on later
-      // segments-change re-renders.
       setPendingConsent(null);
+      return;
+    }
+
+    const loanAppId = pendingLoan?.application_id;
+    const loanDealerId = pendingLoan?.dealer_id || "";
+    const alreadyOnLoan = inAuth && segments[1] === "loan" && segments[2] === "apply";
+
+    if (loanAppId && !alreadyOnLoan) {
+      if (!user) {
+        router.replace({
+          pathname: "/(public)/login",
+          params: { loan_app_id: loanAppId, loan_dealer_id: loanDealerId },
+        });
+      } else {
+        router.replace({
+          pathname: "/(auth)/loan/apply",
+          params: { a: loanAppId, d: loanDealerId },
+        });
+      }
+      setPendingLoan(null);
       return;
     }
 
@@ -120,7 +160,7 @@ export default function RootLayout() {
     } else if (user && !inAuth && !inPublic) {
       router.replace("/(auth)");
     }
-  }, [user, segments, router, pendingConsent, params.consent_id, params.redirect_uri, params.state]);
+  }, [user, segments, router, pendingConsent, pendingLoan, params.consent_id, params.redirect_uri, params.state]);
 
   if (user === undefined) {
     return (

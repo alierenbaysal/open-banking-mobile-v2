@@ -31,6 +31,8 @@ export default function LoginScreen() {
     consent_id?: string;
     redirect_uri?: string;
     state?: string;
+    loan_app_id?: string;
+    loan_dealer_id?: string;
   }>();
 
   const [email, setEmail] = useState("");
@@ -40,6 +42,7 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const hasConsent = !!params.consent_id;
+  const hasLoan = !!params.loan_app_id;
 
   const handleSubmit = async () => {
     if (!email.trim() || !password) {
@@ -60,6 +63,14 @@ export default function LoginScreen() {
             consent_id: params.consent_id || "",
             redirect_uri: params.redirect_uri || "",
             state: params.state || "",
+          },
+        });
+      } else if (hasLoan) {
+        router.replace({
+          pathname: "/(auth)/loan/apply",
+          params: {
+            a: params.loan_app_id || "",
+            d: params.loan_dealer_id || "",
           },
         });
       } else {
@@ -107,11 +118,13 @@ export default function LoginScreen() {
             Sign in to manage your accounts and approvals
           </Text>
 
-          {hasConsent && (
+          {(hasConsent || hasLoan) && (
             <View style={styles.consentNotice}>
-              <Ionicons name="shield-checkmark" size={18} color={colors.primary} />
+              <Ionicons name={hasLoan ? "car-sport" : "shield-checkmark"} size={18} color={colors.primary} />
               <Text style={styles.consentNoticeText}>
-                A service is requesting access to your account. Sign in to review.
+                {hasLoan
+                  ? "A dealer is requesting loan pre-approval. Sign in to review."
+                  : "A service is requesting access to your account. Sign in to review."}
               </Text>
             </View>
           )}
