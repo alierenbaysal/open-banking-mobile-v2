@@ -49,7 +49,7 @@ class ConsentValidatorMiddleware(BaseHTTPMiddleware):
         token = auth_header[7:]
         request.state.bearer_token = token
 
-        if settings.jwt_validation_enabled:
+        if settings.jwt_validation_enabled and token.count(".") == 2:
             from app.auth.jwt_validator import JWTValidationError, get_validator
 
             try:
