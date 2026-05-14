@@ -14,7 +14,8 @@ router = APIRouter(prefix="/open-banking/v4.0/aisp", tags=["AIS Consents"])
 async def create_account_access_consent(request: Request):
     body = await request.json()
     adapter = get_adapter()
-    result = await adapter.create_account_access_consent(body)
+    client_id = getattr(request.state, "client_id", None)
+    result = await adapter.create_account_access_consent(body, client_id=client_id)
     return JSONResponse(status_code=201, content=result)
 
 

@@ -148,16 +148,39 @@ class MockAdapter(OBIEAdapter):
 
     # ── AIS: Account Access Consents ────────────────────────────────────
 
-    async def create_account_access_consent(self, data: dict[str, Any]) -> dict[str, Any]:
+    async def create_account_access_consent(self, data: dict[str, Any], *, client_id: str | None = None) -> dict[str, Any]:
         consent_data = data.get("Data", {})
-        consent_id = f"urn:bankdhofar:consent:{_uuid()}"
+        permissions = consent_data.get("Permissions", [])
+        tpp_id = client_id or "unknown-tpp"
+
+        consent_id = None
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(
+                    f"{settings.consent_service_url}/consents",
+                    json={
+                        "consent_type": "account-access",
+                        "tpp_id": tpp_id,
+                        "permissions": permissions,
+                        "expiration_time": consent_data.get("ExpirationDateTime"),
+                    },
+                )
+                if resp.status_code == 201:
+                    cs_data = resp.json()
+                    consent_id = cs_data.get("consent_id")
+        except Exception as exc:
+            logger.warning("Failed to persist account-access consent to consent service: %s", exc)
+
+        if not consent_id:
+            consent_id = f"urn:bankdhofar:consent:{_uuid()}"
+
         now = _now()
         consent = {
             "ConsentId": consent_id,
             "Status": "AwaitingAuthorisation",
             "StatusUpdateDateTime": now,
             "CreationDateTime": now,
-            "Permissions": consent_data.get("Permissions", []),
+            "Permissions": permissions,
             "ExpirationDateTime": consent_data.get("ExpirationDateTime"),
             "TransactionFromDateTime": consent_data.get("TransactionFromDateTime"),
             "TransactionToDateTime": consent_data.get("TransactionToDateTime"),
