@@ -121,12 +121,11 @@ export async function openBankConsent(
 
   const deepLink = `bdonline://consent/approve?${params.toString()}`;
 
-  const canOpen = await Linking.canOpenURL(deepLink);
-  if (!canOpen) {
+  try {
+    await Linking.openURL(deepLink);
+  } catch {
     throw new Error("BD Online app is not installed");
   }
-
-  await Linking.openURL(deepLink);
 }
 
 export async function getStoredPaymentState(): Promise<{
