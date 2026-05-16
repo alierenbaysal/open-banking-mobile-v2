@@ -14,7 +14,10 @@
       "supportsTablet": true,
       "associatedDomains": [
         "applinks:sadad.tnd.bankdhofar.com"
-      ]
+      ],
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.bankdhofar.sadad",

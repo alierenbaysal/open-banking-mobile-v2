@@ -11,7 +11,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.bankdhofar.sandbox",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.bankdhofar.sandbox",

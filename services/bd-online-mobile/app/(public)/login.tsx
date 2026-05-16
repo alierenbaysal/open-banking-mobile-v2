@@ -97,7 +97,7 @@ export default function LoginScreen() {
       >
       {/* BUILD_BADGE_INJECTED */}
       <View style={{position:"absolute",top:4,right:8,zIndex:10,backgroundColor:"#F59E0B",paddingHorizontal:8,paddingVertical:3,borderRadius:6}}>
-        <Text style={{color:"white",fontSize:10,fontWeight:"700"}}>v3 · 2026-05-14 22:16 Oman</Text>
+        <Text style={{color:"white",fontSize:10,fontWeight:"700"}}>v4 · 2026-05-16 Oman</Text>
       </View>
         <LinearGradient
           colors={gradients.hero}

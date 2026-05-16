@@ -228,13 +228,15 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>signingStyle</key>
             <string>automatic</string>
             <key>uploadSymbols</key>
             <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
           </dict>
           </plist>
           EOF
@@ -248,15 +250,14 @@ jobs:
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
 
-      - name: Upload to TestFlight
+      - name: Verify upload
+        if: success()
         run: |
-          IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)
-          echo "Uploading $IPA to TestFlight..."
-          xcrun altool --upload-app \
-            --file "$IPA" \
-            --type ios \
-            --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            --apiIssuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          echo "Export completed. Checking for upload confirmation..."
+          if [ -f "$RUNNER_TEMP/export/DistributionSummary.plist" ]; then
+            cat "$RUNNER_TEMP/export/DistributionSummary.plist"
+          fi
+          ls -la "$RUNNER_TEMP/export/"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4

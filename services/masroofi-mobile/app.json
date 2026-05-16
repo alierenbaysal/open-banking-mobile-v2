@@ -15,7 +15,8 @@
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "bdonline"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

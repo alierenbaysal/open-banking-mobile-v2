@@ -14,7 +14,8 @@
       "bundleIdentifier": "com.bankdhofar.bdonline",
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow Bank Dhofar Online to use the camera to scan QR codes for car loan applications and bill payments."
+        "NSCameraUsageDescription": "Allow Bank Dhofar Online to use the camera to scan QR codes for car loan applications and bill payments.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
