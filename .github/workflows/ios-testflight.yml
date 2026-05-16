@@ -96,22 +96,20 @@ jobs:
           cd "$APP_DIR"
           npm install --legacy-peer-deps
 
-      - name: Set build number in app.json
-        run: |
-          cd "$APP_DIR"
-          BUILD_NUM=${{ github.run_number }}
-          python3 -c "
-          import json
-          with open('app.json') as f: d = json.load(f)
-          d['expo'].setdefault('ios', {})['buildNumber'] = str($BUILD_NUM)
-          with open('app.json', 'w') as f: json.dump(d, f, indent=2)
-          "
-          echo "Build number set to $BUILD_NUM"
-
       - name: Generate native iOS project
         run: |
           cd "$APP_DIR"
           npx expo prebuild --platform ios --no-install --clean
+
+      - name: Set build number
+        run: |
+          cd "$APP_DIR/ios"
+          BUILD_NUM=${{ github.run_number }}
+          PLIST=$(find . -maxdepth 2 -name 'Info.plist' ! -path '*/Pods/*' | head -1)
+          if [ -n "$PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" "$PLIST"
+            echo "Set CFBundleVersion=$BUILD_NUM in $PLIST"
+          fi
 
       - name: Install CocoaPods
         run: |
@@ -161,7 +159,12 @@ jobs:
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
-            | xcbeautify || true
+            | xcbeautify
+
+          if [ ! -d "$RUNNER_TEMP/app.xcarchive" ]; then
+            echo "::error::Archive was not produced — xcodebuild likely failed silently"
+            exit 1
+          fi
 
       - name: Export IPA
         run: |
