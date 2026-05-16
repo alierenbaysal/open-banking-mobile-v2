@@ -167,9 +167,9 @@ jobs:
           CERT_IDS=$(echo "$CERTS" | python3 -c "
           import sys, json
           d = json.load(sys.stdin)
-          dist_types = ['IOS_DISTRIBUTION', 'DISTRIBUTION', 'APPLE_DISTRIBUTION']
+          revoke_types = ['DEVELOPMENT', 'IOS_DEVELOPMENT', 'IOS_DISTRIBUTION', 'DISTRIBUTION', 'APPLE_DISTRIBUTION', 'APPLE_DEVELOPMENT']
           for c in d.get('data', []):
-              if c['attributes']['certificateType'] in dist_types:
+              if c['attributes']['certificateType'] in revoke_types:
                   print(c['id'])
           " 2>/dev/null)
 
