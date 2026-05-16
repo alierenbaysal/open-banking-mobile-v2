@@ -73,7 +73,7 @@ export default function LoanApplyScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
       const u = await getStoredUser();
       const customerId = u?.customer_id || "CUST-001";
-      const consentId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const consentId = crypto.randomUUID();
 
       const r = await fetch(
         `${API_BASE}/api/loan/internal/v1/loan-applications/${info.application_id}/customer-consent`,
