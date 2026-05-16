@@ -250,14 +250,94 @@ jobs:
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
 
-      - name: Verify upload
+      - name: Set compliance and distribute to testers
         if: success()
         run: |
-          echo "Export completed. Checking for upload confirmation..."
-          if [ -f "$RUNNER_TEMP/export/DistributionSummary.plist" ]; then
-            cat "$RUNNER_TEMP/export/DistributionSummary.plist"
-          fi
-          ls -la "$RUNNER_TEMP/export/"
+          set +e
+          python3 -m pip install PyJWT cryptography -q --break-system-packages 2>/dev/null || \
+            python3 -m pip install PyJWT cryptography -q --user 2>/dev/null
+          export PYTHONPATH="$(python3 -m site --user-site):${PYTHONPATH:-}"
+
+          python3 << 'PYTHON'
+          import jwt, time, os, json, urllib.request, urllib.error
+
+          key = open(os.path.expanduser(f"~/private_keys/AuthKey_{os.environ['KEY_ID']}.p8")).read()
+          now = int(time.time())
+          payload = {'iss': os.environ['ISSUER'], 'iat': now, 'exp': now + 600, 'aud': 'appstoreconnect-v1'}
+          token = jwt.encode(payload, key, algorithm='ES256', headers={'kid': os.environ['KEY_ID']})
+
+          headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+          app_id = os.environ['APP_ID']
+          bundle_id = os.environ['BUNDLE_ID']
+          build_num = os.environ['BUILD_NUM']
+
+          # Find app if APP_ID not provided
+          if not app_id:
+              req = urllib.request.Request(
+                  f"https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]={bundle_id}",
+                  headers=headers)
+              resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
+              app_id = resp['data'][0]['id']
+              print(f"Found app: {app_id}")
+
+          # Find the build by version number
+          req = urllib.request.Request(
+              f"https://api.appstoreconnect.apple.com/v1/builds?filter[app]={app_id}&filter[version]={build_num}&limit=1",
+              headers=headers)
+          resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
+          if not resp['data']:
+              print(f"Build {build_num} not found yet (still processing). Retrying in 30s...")
+              import time as t
+              t.sleep(30)
+              resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
+
+          if not resp['data']:
+              print(f"Build {build_num} still not found. Skipping compliance/distribution.")
+              exit(0)
+
+          build_id = resp['data'][0]['id']
+          enc = resp['data'][0]['attributes'].get('usesNonExemptEncryption')
+          print(f"Build ID: {build_id}, usesNonExemptEncryption: {enc}")
+
+          # Set compliance if needed
+          if enc is None:
+              body = json.dumps({"data":{"type":"builds","id":build_id,"attributes":{"usesNonExemptEncryption":False}}}).encode()
+              req = urllib.request.Request(
+                  f"https://api.appstoreconnect.apple.com/v1/builds/{build_id}",
+                  data=body, headers=headers, method='PATCH')
+              urllib.request.urlopen(req, timeout=30)
+              print("Set usesNonExemptEncryption=false")
+
+          # Add to Internal Testers group
+          # Find internal beta group
+          req = urllib.request.Request(
+              f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}/betaGroups",
+              headers=headers)
+          resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
+          internal_group = next((g for g in resp['data'] if g['attributes'].get('isInternalGroup')), None)
+
+          if internal_group:
+              body = json.dumps({"data":[{"type":"builds","id":build_id}]}).encode()
+              req = urllib.request.Request(
+                  f"https://api.appstoreconnect.apple.com/v1/betaGroups/{internal_group['id']}/relationships/builds",
+                  data=body, headers=headers, method='POST')
+              try:
+                  urllib.request.urlopen(req, timeout=30)
+                  print(f"Added build to '{internal_group['attributes']['name']}' group")
+              except urllib.error.HTTPError as e:
+                  if e.code == 409:
+                      print("Build already in group")
+                  else:
+                      print(f"Warning: could not add to group: {e.code} {e.read().decode()}")
+          else:
+              print("No internal beta group found")
+          PYTHON
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          BUNDLE_ID: ${{ steps.app-config.outputs.bundle_id }}
+          BUILD_NUM: ${{ github.run_number }}
+          APP_ID: ""
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
