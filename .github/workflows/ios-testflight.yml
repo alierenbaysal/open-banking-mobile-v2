@@ -152,21 +152,25 @@ jobs:
           fi
 
           CERTS=$(curl -s -H "Authorization: Bearer $JWT" \
-            "https://api.appstoreconnect.apple.com/v1/certificates?filter[certificateType]=IOS_DISTRIBUTION&limit=10")
+            "https://api.appstoreconnect.apple.com/v1/certificates?limit=200")
 
           echo "$CERTS" | python3 -c "
           import sys, json
           d = json.load(sys.stdin)
-          print(f'Found {len(d.get(\"data\",[]))} distribution certificates')
-          for c in d.get('data', []):
-              print(f'  - {c[\"id\"]} type={c[\"attributes\"][\"certificateType\"]} name={c[\"attributes\"].get(\"name\",\"?\")}')
+          all_certs = d.get('data', [])
+          print(f'Found {len(all_certs)} total certificates')
+          for c in all_certs:
+              ct = c['attributes']['certificateType']
+              print(f'  - {c[\"id\"]} type={ct} name={c[\"attributes\"].get(\"name\",\"?\")}')
           " 2>/dev/null
 
           CERT_IDS=$(echo "$CERTS" | python3 -c "
           import sys, json
           d = json.load(sys.stdin)
+          dist_types = ['IOS_DISTRIBUTION', 'DISTRIBUTION', 'APPLE_DISTRIBUTION']
           for c in d.get('data', []):
-              print(c['id'])
+              if c['attributes']['certificateType'] in dist_types:
+                  print(c['id'])
           " 2>/dev/null)
 
           for CID in $CERT_IDS; do
