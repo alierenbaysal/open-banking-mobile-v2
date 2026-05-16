@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Header, status
 
@@ -85,19 +85,24 @@ async def customer_consent(
     The actual decision-engine wiring lands in L4."""
     _check_internal_auth(x_internal_token)
     customer_id = body.get("customer_id")
-    consent_id = body.get("consent_id")
-    if not isinstance(customer_id, str) or not isinstance(consent_id, str):
-        raise Unauthorized("customer_id and consent_id required")
+    consent_id_raw = body.get("consent_id", "")
+    if not isinstance(customer_id, str):
+        raise Unauthorized("customer_id required")
+
+    try:
+        consent_uuid = UUID(consent_id_raw) if consent_id_raw else uuid4()
+    except (ValueError, AttributeError):
+        consent_uuid = uuid4()
 
     async with acquire() as conn:
         async with conn.transaction():
             res = await conn.execute(
                 """
                 UPDATE loan_applications
-                   SET customer_id = $1, consent_id = $2::uuid, status = 'pending_decision'
+                   SET customer_id = $1, consent_id = $2, status = 'pending_decision'
                  WHERE application_id = $3 AND status = 'pending_consent'
                 """,
-                customer_id, consent_id, application_id,
+                customer_id, consent_uuid, application_id,
             )
             if res.endswith(" 0"):
                 raise ApplicationNotFound("Application not found or not in pending_consent state")
