@@ -136,13 +136,10 @@ export async function buildConsentRedirectUrls(
 export async function openBankConsent(consentId: string): Promise<string> {
   const { deepLink, deepLinkExpoGo, webFallback } = await buildConsentRedirectUrls(consentId);
 
-  // 1. Native scheme
+  // 1. Native scheme — skip canOpenURL (unreliable after fresh install on iOS)
   try {
-    const canOpen = await Linking.canOpenURL(deepLink);
-    if (canOpen) {
-      await Linking.openURL(deepLink);
-      return deepLink;
-    }
+    await Linking.openURL(deepLink);
+    return deepLink;
   } catch {
     // fall through
   }
