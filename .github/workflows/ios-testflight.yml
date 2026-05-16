@@ -101,6 +101,13 @@ jobs:
           cd "$APP_DIR"
           npx expo prebuild --platform ios --no-install --clean
 
+      - name: Set build number
+        run: |
+          cd "$APP_DIR/ios"
+          BUILD_NUM=${{ github.run_number }}
+          find . -name "Info.plist" -exec /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" {} \; 2>/dev/null || true
+          echo "Build number set to $BUILD_NUM"
+
       - name: Install CocoaPods
         run: |
           cd "$APP_DIR/ios"
