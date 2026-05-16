@@ -129,6 +129,52 @@ jobs:
           mkdir -p ~/private_keys
           echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 -d > ~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
 
+      - name: Revoke stale distribution certificates
+        run: |
+          KEY_FILE=~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          KEY_ID="${{ secrets.APP_STORE_CONNECT_KEY_ID }}"
+          ISSUER="${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+
+          # Generate JWT for App Store Connect API
+          JWT=$(python3 -c "
+          import jwt, time, sys
+          key = open('$KEY_FILE').read()
+          now = int(time.time())
+          payload = {'iss': '$ISSUER', 'iat': now, 'exp': now + 600, 'aud': 'appstoreconnect-v1'}
+          token = jwt.encode(payload, key, algorithm='ES256', headers={'kid': '$KEY_ID'})
+          print(token)
+          " 2>/dev/null) || true
+
+          if [ -z "$JWT" ]; then
+            pip install PyJWT cryptography -q
+            JWT=$(python3 -c "
+          import jwt, time
+          key = open('$KEY_FILE').read()
+          now = int(time.time())
+          payload = {'iss': '$ISSUER', 'iat': now, 'exp': now + 600, 'aud': 'appstoreconnect-v1'}
+          token = jwt.encode(payload, key, algorithm='ES256', headers={'kid': '$KEY_ID'})
+          print(token)
+          ")
+          fi
+
+          # List and revoke iOS distribution certificates
+          CERTS=$(curl -s -H "Authorization: Bearer $JWT" \
+            "https://api.appstoreconnect.apple.com/v1/certificates?filter[certificateType]=IOS_DISTRIBUTION&limit=10")
+
+          CERT_IDS=$(echo "$CERTS" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for c in d.get('data', []):
+              print(c['id'])
+          " 2>/dev/null || true)
+
+          for CID in $CERT_IDS; do
+            echo "Revoking certificate $CID..."
+            curl -s -X DELETE -H "Authorization: Bearer $JWT" \
+              "https://api.appstoreconnect.apple.com/v1/certificates/$CID" || true
+          done
+          echo "Certificate cleanup done"
+
       - name: Read app config
         id: app-config
         run: |
@@ -158,6 +204,7 @@ jobs:
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
             CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
             | xcbeautify
 
