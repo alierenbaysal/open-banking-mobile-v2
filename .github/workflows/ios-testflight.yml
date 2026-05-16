@@ -133,7 +133,10 @@ jobs:
         continue-on-error: true
         run: |
           set +e
-          python3 -m pip install PyJWT cryptography -q
+          python3 -m pip install PyJWT cryptography -q --break-system-packages 2>/dev/null || \
+            python3 -m pip install PyJWT cryptography -q --user 2>/dev/null || \
+            python3 -m pip install PyJWT cryptography -q 2>/dev/null
+          export PYTHONPATH="$(python3 -m site --user-site):${PYTHONPATH:-}"
 
           JWT=$(python3 -c "
           import jwt, time, os
