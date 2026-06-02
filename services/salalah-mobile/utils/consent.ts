@@ -13,6 +13,10 @@ const API_BASE = "https://banking-api.omtd.bankdhofar.com";
 const CLIENT_ID = "salalah-souq-demo";
 const REDIRECT_URI = "salalahsouq://callback";
 
+const BD_ONLINE_DEEPLINK_NATIVE = "bdonline://consent/approve";
+const BD_ONLINE_DEEPLINK_EXPO_GO = "exp://expo-bdonline.omtd.bankdhofar.com/--/consent/approve";
+const BD_ONLINE_WEB = "https://banking-api.omtd.bankdhofar.com/consent/approve";
+
 function randomState(): string {
   const bytes = new Uint8Array(24);
   for (let i = 0; i < bytes.length; i++) {
@@ -119,13 +123,26 @@ export async function openBankConsent(
     redirect_uri: REDIRECT_URI,
   });
 
-  const deepLink = `bdonline://consent/approve?${params.toString()}`;
+  const query = params.toString();
 
+  // 1. Native scheme — may fail on iOS after fresh TestFlight install
   try {
-    await Linking.openURL(deepLink);
+    await Linking.openURL(`${BD_ONLINE_DEEPLINK_NATIVE}?${query}`);
+    return;
   } catch {
-    throw new Error("BD Online app is not installed");
+    // fall through
   }
+
+  // 2. Expo Go cross-app deep link
+  try {
+    await Linking.openURL(`${BD_ONLINE_DEEPLINK_EXPO_GO}?${query}`);
+    return;
+  } catch {
+    // fall through
+  }
+
+  // 3. Web fallback
+  await Linking.openURL(`${BD_ONLINE_WEB}?${query}`);
 }
 
 export async function getStoredPaymentState(): Promise<{
