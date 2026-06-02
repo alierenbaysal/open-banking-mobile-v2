@@ -50,6 +50,17 @@ spec:
               number: 8000
       timeout: 10s
 
+    # THEQA SAML SP (national-id verification) → ob-theqa-service
+    - match:
+        - uri:
+            prefix: /theqa/
+      route:
+        - destination:
+            host: ob-theqa-service.{{ .Values.global.namespace }}.svc.cluster.local
+            port:
+              number: 8000
+      timeout: 20s
+
     # Health check passthrough
     - match:
         - uri:

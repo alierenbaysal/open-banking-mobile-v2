@@ -71,6 +71,32 @@ eventService:
       cpu: 250m
       memory: 256Mi
 
+theqaService:
+  replicas: 1
+  image: ob-theqa-service
+  port: 8000
+  env:
+    LOG_LEVEL: "INFO"
+    SAML_SP_ENTITY_ID: "36f54cb6-f700-46b0-81d3-5caa4ad322f0"
+    SAML_SP_BASE_URL: "https://theqa.omtd.bankdhofar.com"
+    SAML_IDP_ENTITY_ID: "https://SASIdp"
+    SAML_IDP_SSO_URL: "https://stg-idp-pki.mtcit.gov.om/Idp/SingleSignOnService"
+    SAML_IDP_SLO_URL: "https://stg-idp-pki.mtcit.gov.om/Idp/SingleLogoutService"
+    APP_RETURN_DEEPLINK: "bdonline://verify/callback"
+  # Istio egress to the MTCIT THEQA SAS hosts over the IPsec tunnel.
+  egress:
+    enabled: true
+    idpAddresses:
+      - "10.31.10.22"
+      - "10.31.10.33"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
 portal:
   replicas: 1
   image: ob-portal

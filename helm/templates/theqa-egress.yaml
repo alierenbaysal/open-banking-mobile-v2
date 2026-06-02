@@ -1,0 +1,42 @@
+{{- if .Values.theqaService.egress.enabled }}
+---
+# ServiceEntry — register the MTCIT THEQA SAS hosts as known external endpoints
+# so the Istio sidecar permits ob-theqa-service egress over the IPsec tunnel.
+# Without this, mesh-internal pods (Envoy outbound) drop traffic to these IPs.
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: theqa-sas-idp
+  namespace: {{ .Values.global.namespace }}
+spec:
+  hosts:
+    - stg-idp-pki.mtcit.gov.om
+  addresses:
+    {{- range .Values.theqaService.egress.idpAddresses }}
+    - {{ . | quote }}
+    {{- end }}
+  ports:
+    - number: 443
+      name: https
+      protocol: TLS
+  location: MESH_EXTERNAL
+  resolution: STATIC
+  endpoints:
+    {{- range .Values.theqaService.egress.idpAddresses }}
+    - address: {{ . | quote }}
+    {{- end }}
+---
+# Pin SNI so TLS to the IdP carries the hostname MTCIT's cert expects, even
+# though we connect by IP over the tunnel.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: theqa-sas-idp
+  namespace: {{ .Values.global.namespace }}
+spec:
+  host: stg-idp-pki.mtcit.gov.om
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      sni: stg-idp-pki.mtcit.gov.om
+{{- end }}

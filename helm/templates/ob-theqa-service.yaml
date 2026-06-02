@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ob-theqa-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: ob-theqa-service
+    app.kubernetes.io/part-of: qantara
+spec:
+  replicas: {{ .Values.theqaService.replicas }}
+  selector:
+    matchLabels:
+      app: ob-theqa-service
+  template:
+    metadata:
+      labels:
+        app: ob-theqa-service
+        app.kubernetes.io/part-of: qantara
+    spec:
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: ob-theqa-service
+          image: {{ .Values.global.registry }}/{{ .Values.theqaService.image }}:{{ .Values.global.imageTag }}
+          ports:
+            - containerPort: {{ .Values.theqaService.port }}
+              protocol: TCP
+          env:
+            - name: SERVICE_PORT
+              value: "{{ .Values.theqaService.port }}"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-db-credentials
+                  key: uri
+            - name: LOG_LEVEL
+              value: {{ .Values.theqaService.env.LOG_LEVEL | quote }}
+            - name: SAML_SP_ENTITY_ID
+              value: {{ .Values.theqaService.env.SAML_SP_ENTITY_ID | quote }}
+            - name: SAML_SP_BASE_URL
+              value: {{ .Values.theqaService.env.SAML_SP_BASE_URL | quote }}
+            - name: SAML_IDP_ENTITY_ID
+              value: {{ .Values.theqaService.env.SAML_IDP_ENTITY_ID | quote }}
+            - name: SAML_IDP_SSO_URL
+              value: {{ .Values.theqaService.env.SAML_IDP_SSO_URL | quote }}
+            - name: SAML_IDP_SLO_URL
+              value: {{ .Values.theqaService.env.SAML_IDP_SLO_URL | quote }}
+            - name: APP_RETURN_DEEPLINK
+              value: {{ .Values.theqaService.env.APP_RETURN_DEEPLINK | quote }}
+            # SP cert/key + IdP signing cert come from the qantara-theqa-saml secret.
+            - name: SAML_SP_X509CERT
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-theqa-saml
+                  key: sp_x509cert
+            - name: SAML_SP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-theqa-saml
+                  key: sp_private_key
+            - name: SAML_IDP_X509CERT
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-theqa-saml
+                  key: idp_x509cert
+                  optional: true
+          resources:
+            {{- toYaml .Values.theqaService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.theqaService.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.theqaService.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ob-theqa-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: ob-theqa-service
+spec:
+  selector:
+    app: ob-theqa-service
+  ports:
+    - port: 8000
+      targetPort: {{ .Values.theqaService.port }}
+      protocol: TCP

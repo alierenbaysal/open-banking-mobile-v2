@@ -106,6 +106,20 @@ build-ob-event-service:
       changes:
         - services/ob-event-service/**/*
 
+build-ob-theqa-service:
+  <<: *build_template
+  script:
+    - >
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/services/ob-theqa-service"
+      --dockerfile "${CI_PROJECT_DIR}/services/ob-theqa-service/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/ob-theqa-service:${CI_COMMIT_SHORT_SHA}"
+      --destination "${CI_REGISTRY_IMAGE}/ob-theqa-service:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-theqa-service/**/*
+
 build-ob-portal:
   <<: *build_template
   script:
