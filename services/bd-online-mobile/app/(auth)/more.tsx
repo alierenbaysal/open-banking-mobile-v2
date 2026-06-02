@@ -141,6 +141,11 @@ export default function MoreScreen() {
       {/* Settings menu */}
       <Text style={styles.sectionHeader}>Settings</Text>
       <Card padding="none">
+        <MenuRow
+          icon="shield-checkmark-outline"
+          label="Verify Identity (THEQA)"
+          onPress={() => router.push("/(auth)/verify")}
+        />
         <MenuRow icon="notifications-outline" label="Notifications" onPress={() => {}} />
         <MenuRow icon="lock-closed-outline" label="Security" onPress={() => {}} />
         <MenuRow icon="finger-print-outline" label="Biometric Login" onPress={() => {}} />

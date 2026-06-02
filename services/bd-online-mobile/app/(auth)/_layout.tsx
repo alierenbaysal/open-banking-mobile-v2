@@ -86,6 +86,7 @@ export default function AuthLayout() {
       <Tabs.Screen name="loan/scan" options={{ href: null }} />
       <Tabs.Screen name="loan/apply" options={{ href: null }} />
       <Tabs.Screen name="loan/offer" options={{ href: null }} />
+      <Tabs.Screen name="verify" options={{ href: null }} />
     </Tabs>
   );
 }

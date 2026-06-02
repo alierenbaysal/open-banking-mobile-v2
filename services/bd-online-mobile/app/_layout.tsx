@@ -32,6 +32,11 @@ interface PendingLoan {
   dealer_id: string;
 }
 
+interface PendingVerify {
+  reference: string;
+  status: string;
+}
+
 function parseConsentFromUrl(url: string | null | undefined): PendingConsent | null {
   if (!url) return null;
   try {
@@ -64,10 +69,25 @@ function parseLoanFromUrl(url: string | null | undefined): PendingLoan | null {
   }
 }
 
+function parseVerifyFromUrl(url: string | null | undefined): PendingVerify | null {
+  if (!url) return null;
+  try {
+    const p = Linking.parse(url);
+    if (!p.path?.includes("verify/callback")) return null;
+    const qp = p.queryParams || {};
+    const ref = typeof qp.ref === "string" ? qp.ref : null;
+    if (!ref) return null;
+    return { reference: ref, status: typeof qp.status === "string" ? qp.status : "pending" };
+  } catch {
+    return null;
+  }
+}
+
 export default function RootLayout() {
   const [user, setUser] = useState<BankUser | null | undefined>(undefined);
   const [pendingConsent, setPendingConsent] = useState<PendingConsent | null>(null);
   const [pendingLoan, setPendingLoan] = useState<PendingLoan | null>(null);
+  const [pendingVerify, setPendingVerify] = useState<PendingVerify | null>(null);
   const segments = useSegments();
   const router = useRouter();
   const params = useGlobalSearchParams<{
@@ -90,12 +110,16 @@ export default function RootLayout() {
     Linking.getInitialURL().then((url) => {
       const consent = parseConsentFromUrl(url);
       if (consent) { setPendingConsent(consent); return; }
+      const verify = parseVerifyFromUrl(url);
+      if (verify) { setPendingVerify(verify); return; }
       const loan = parseLoanFromUrl(url);
       if (loan) setPendingLoan(loan);
     });
     const sub = Linking.addEventListener("url", (ev) => {
       const consent = parseConsentFromUrl(ev.url);
       if (consent) { setPendingConsent(consent); return; }
+      const verify = parseVerifyFromUrl(ev.url);
+      if (verify) { setPendingVerify(verify); return; }
       const loan = parseLoanFromUrl(ev.url);
       if (loan) setPendingLoan(loan);
     });
@@ -133,6 +157,19 @@ export default function RootLayout() {
       return;
     }
 
+    // THEQA verification callback (bdonline://verify/callback?ref=...&status=...).
+    // Only meaningful for an authenticated user; route to the result screen.
+    const verifyRef = pendingVerify?.reference;
+    const alreadyOnVerify = inAuth && segments[1] === "verify";
+    if (verifyRef && user && !alreadyOnVerify) {
+      router.replace({
+        pathname: "/(auth)/verify",
+        params: { ref: verifyRef, status: pendingVerify?.status || "pending" },
+      });
+      setPendingVerify(null);
+      return;
+    }
+
     const loanAppId = pendingLoan?.application_id;
     const loanDealerId = pendingLoan?.dealer_id || "";
     const alreadyOnLoan = inAuth && segments[1] === "loan" && segments[2] === "scan";
@@ -160,7 +197,7 @@ export default function RootLayout() {
     } else if (user && !inAuth && !inPublic) {
       router.replace("/(auth)");
     }
-  }, [user, segments, router, pendingConsent, pendingLoan, params.consent_id, params.redirect_uri, params.state]);
+  }, [user, segments, router, pendingConsent, pendingLoan, pendingVerify, params.consent_id, params.redirect_uri, params.state]);
 
   if (user === undefined) {
     return (
