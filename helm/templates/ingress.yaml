@@ -18,6 +18,23 @@ spec:
     - host: {{ .Values.global.domain }}
       http:
         paths:
+          # THEQA SAML SP — registered with MTCIT as
+          # qantara-api.omtd.bankdhofar.com/auth/saml/{acs,sls}. omtd traffic
+          # reaches here via the nginx ingress controller (10.0.130.195).
+          - path: /auth/saml/
+            pathType: Prefix
+            backend:
+              service:
+                name: ob-theqa-service
+                port:
+                  number: 8000
+          - path: /auth/verifications
+            pathType: Prefix
+            backend:
+              service:
+                name: ob-theqa-service
+                port:
+                  number: 8000
           - path: /open-banking/
             pathType: Prefix
             backend:
