@@ -1,0 +1,62 @@
+{{- /*
+Gateway-API HTTPRoutes on the NATIVE OCI-LoadBalancer Istio gateway
+(istio-ingress/ingressgateway, LB 10.150.18.18) — the real off-F5 path.
+
+NOTE: the F5 BIG-IP fronts BOTH the nginx-ingress (10.0.130.195) and the
+old istio-system/istio-ingressgateway (10.0.130.210). Only istio-ingress/
+ingressgateway (10.150.18.18) is a native OCI LB. The external *.omtd hosts
+reach these routes via the DMZ ServiceEntries repointed to 10.150.18.18.
+Internal *.tnd DNS still resolves to the F5/nginx VIP (10.0.130.195) — moving
+internal off F5 requires external-dns/private-zone changes (tracked separately).
+*/ -}}
+{{- $gw := dict "name" "ingressgateway" "namespace" "istio-ingress" -}}
+{{- $ns := .Values.global.namespace -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: qantara
+  namespace: {{ $ns }}
+spec:
+  parentRefs:
+    - { name: ingressgateway, namespace: istio-ingress }
+  hostnames: ["qantara.tnd.bankdhofar.com"]
+  rules:
+    - matches:
+        - { path: { type: PathPrefix, value: /auth/saml/ } }
+        - { path: { type: PathPrefix, value: /auth/verifications } }
+      backendRefs: [{ name: ob-theqa-service, port: 8000 }]
+    - matches:
+        - { path: { type: PathPrefix, value: /open-banking/ } }
+        - { path: { type: PathPrefix, value: /health } }
+        - { path: { type: PathPrefix, value: /docs } }
+        - { path: { type: PathPrefix, value: /redoc } }
+        - { path: { type: PathPrefix, value: /openapi.json } }
+      backendRefs: [{ name: ob-api-server, port: 8000 }]
+    - matches: [{ path: { type: PathPrefix, value: /portal-api/ } }]
+      backendRefs: [{ name: ob-tpp-manager, port: 8000 }]
+    - matches: [{ path: { type: PathPrefix, value: /webhooks/ } }]
+      backendRefs: [{ name: ob-event-service, port: 8000 }]
+    - matches: [{ path: { type: PathPrefix, value: / } }]
+      backendRefs: [{ name: ob-portal, port: 80 }]
+{{- range $m := list
+    (dict "name" "bd-online"           "host" "banking.tnd.bankdhofar.com"      "svc" "bd-online"           "port" 80)
+    (dict "name" "hisab"               "host" "hisab.tnd.bankdhofar.com"        "svc" "hisab"               "port" 80)
+    (dict "name" "masroofi"            "host" "masroofi.tnd.bankdhofar.com"     "svc" "masroofi"            "port" 80)
+    (dict "name" "muscat-motors"       "host" "muscatmotors.tnd.bankdhofar.com" "svc" "muscat-motors"       "port" 80)
+    (dict "name" "sadad"               "host" "sadad.tnd.bankdhofar.com"        "svc" "sadad"               "port" 80)
+    (dict "name" "salalah-electronics" "host" "salalah.tnd.bankdhofar.com"      "svc" "salalah-electronics" "port" 80)
+}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $m.name }}
+  namespace: {{ $ns }}
+spec:
+  parentRefs:
+    - { name: ingressgateway, namespace: istio-ingress }
+  hostnames: ["{{ $m.host }}"]
+  rules:
+    - backendRefs: [{ name: {{ $m.svc }}, port: {{ $m.port }} }]
+{{- end }}
