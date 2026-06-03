@@ -30,7 +30,7 @@ from app.models.verification import (
 )
 from app.services import saml_provider, verification_service
 
-router = APIRouter(prefix="/theqa", tags=["theqa"])
+router = APIRouter(prefix="/auth", tags=["theqa"])
 logger = logging.getLogger(__name__)
 
 # Attribute names THEQA SAS may use for the national/civil id. We probe these

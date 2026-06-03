@@ -24,9 +24,12 @@ class Settings(BaseSettings):
     # ---- SP (Bank Dhofar) ----
     # Entity ID = the profile id MTCIT created for us on SAS staging.
     saml_sp_entity_id: str = "36f54cb6-f700-46b0-81d3-5caa4ad322f0"
-    saml_sp_base_url: str = "https://theqa.omtd.bankdhofar.com"
-    saml_sp_acs_path: str = "/theqa/saml/acs"
-    saml_sp_sls_path: str = "/theqa/saml/sls"
+    # Registered with MTCIT (Emrah → Asma, 2026-05-18): the SP lives on the
+    # qantara-api DMZ host, ACS/SLS under /auth/saml/. Must match exactly or
+    # THEQA's SAML Destination/AudienceRestriction checks fail.
+    saml_sp_base_url: str = "https://qantara-api.omtd.bankdhofar.com"
+    saml_sp_acs_path: str = "/auth/saml/acs"
+    saml_sp_sls_path: str = "/auth/saml/sls"
     # PEM contents (not paths) — injected from the qantara-theqa-saml secret.
     saml_sp_x509cert: str = ""
     saml_sp_private_key: str = ""

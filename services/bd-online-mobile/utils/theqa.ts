@@ -2,19 +2,20 @@
  * THEQA national-identity verification (eKYC) client.
  *
  * Flow:
- *   1. startVerification(customerId) → POST /theqa/verifications
+ *   1. startVerification(customerId) → POST /auth/verifications
  *      returns { reference, redirect_url }.
  *   2. Caller opens redirect_url (the THEQA SAS IdP). The customer approves
  *      in the THEQA app.
  *   3. THEQA SAS posts the SAML assertion to our SP's ACS, which 302s back to
  *      bdonline://verify/callback?ref=<reference>&status=verified|failed.
- *   4. getVerificationResult(reference) → GET /theqa/verifications/{reference}
+ *   4. getVerificationResult(reference) → GET /auth/verifications/{reference}
  *      to read the asserted identity (national id is held server-side).
  */
 
-// The THEQA SP is served on its own DMZ host (also the SAML ACS host MTCIT
-// calls back to). DMZ ingress routes this host to ob-theqa-service.
-export const THEQA_BASE = "https://theqa.omtd.bankdhofar.com";
+// The THEQA SP is served on the qantara-api DMZ host registered with MTCIT
+// (the SAML ACS/SLS host MTCIT calls back to, reached inbound via NAT
+// 172.16.24.2 → DMZ ingress).
+export const THEQA_BASE = "https://qantara-api.omtd.bankdhofar.com";
 
 export type VerificationStatus = "pending" | "verified" | "failed";
 
@@ -40,7 +41,7 @@ export async function startVerification(
   customerId: string,
   purpose = "onboarding",
 ): Promise<StartVerificationResponse> {
-  const resp = await fetch(`${THEQA_BASE}/theqa/verifications`, {
+  const resp = await fetch(`${THEQA_BASE}/auth/verifications`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ customer_id: customerId, purpose }),
@@ -56,7 +57,7 @@ export async function getVerificationResult(
   reference: string,
 ): Promise<VerificationResult> {
   const resp = await fetch(
-    `${THEQA_BASE}/theqa/verifications/${encodeURIComponent(reference)}`,
+    `${THEQA_BASE}/auth/verifications/${encodeURIComponent(reference)}`,
     { headers: { Accept: "application/json" } },
   );
   if (!resp.ok) {

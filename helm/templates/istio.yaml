@@ -51,9 +51,12 @@ spec:
       timeout: 10s
 
     # THEQA SAML SP (national-id verification) → ob-theqa-service
+    # Registered with MTCIT as qantara-api.omtd.bankdhofar.com/auth/saml/{acs,sls}.
     - match:
         - uri:
-            prefix: /theqa/
+            prefix: /auth/saml/
+        - uri:
+            prefix: /auth/verifications
       route:
         - destination:
             host: ob-theqa-service.{{ .Values.global.namespace }}.svc.cluster.local
