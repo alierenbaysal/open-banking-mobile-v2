@@ -1,0 +1,36 @@
+{{- /*
+Istio VirtualServices for the Open Banking demo merchant apps + BD Online.
+Migrated off the legacy F5 BIG-IP VIP (10.0.130.195) + nginx-ingress onto the
+native Istio ingress gateway (gw-tnd-bankdhofar-com, LB 10.0.130.210).
+The core Qantara host (qantara.tnd.bankdhofar.com) lives in istio.yaml.
+*/ -}}
+{{- $gw := "istio-system/gw-tnd-bankdhofar-com" -}}
+{{- $ns := .Values.global.namespace -}}
+{{- range $m := list
+    (dict "name" "bd-online"           "host" "banking.tnd.bankdhofar.com"      "svc" "bd-online"           "port" 80)
+    (dict "name" "hisab"               "host" "hisab.tnd.bankdhofar.com"        "svc" "hisab"               "port" 80)
+    (dict "name" "masroofi"            "host" "masroofi.tnd.bankdhofar.com"     "svc" "masroofi"            "port" 80)
+    (dict "name" "muscat-motors"       "host" "muscatmotors.tnd.bankdhofar.com" "svc" "muscat-motors"       "port" 80)
+    (dict "name" "sadad"               "host" "sadad.tnd.bankdhofar.com"        "svc" "sadad"               "port" 80)
+    (dict "name" "salalah-electronics" "host" "salalah.tnd.bankdhofar.com"      "svc" "salalah-electronics" "port" 80)
+}}
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ $m.name }}
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: qantara
+spec:
+  hosts:
+    - {{ $m.host }}
+  gateways:
+    - {{ $gw }}
+  http:
+    - route:
+        - destination:
+            host: {{ $m.svc }}.{{ $ns }}.svc.cluster.local
+            port:
+              number: {{ $m.port }}
+{{- end }}
