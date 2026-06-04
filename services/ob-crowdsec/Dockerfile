@@ -7,13 +7,18 @@
 # self-contained image to Harbor. The agent then runs fully offline.
 FROM harbor.cp.bankdhofar.com/dockerhub/crowdsecurity/crowdsec:v1.6.9
 
-# Hub index + the OB-edge detection content. cscli writes to
-# /etc/crowdsec/{collections,parsers,scenarios} + /var/lib/crowdsec/data which
-# are baked into the image layer.
-RUN cscli hub update \
+# The crowdsec image only materializes /etc/crowdsec at container START (its
+# entrypoint copies from /staging/etc/crowdsec). At BUILD time that dir is
+# empty, so cscli fails "open /etc/crowdsec/config.yaml: no such file". Seed the
+# config from the image's staging tree first, then install the hub content into
+# the baked layer. Both /etc/crowdsec and /staging/etc/crowdsec are populated so
+# the result survives the entrypoint's start-time copy either way.
+RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
+ && cscli hub update \
  && cscli parsers install crowdsecurity/envoy-logs \
  && cscli collections install \
       crowdsecurity/base-http-scenarios \
       crowdsecurity/http-cve \
       crowdsecurity/whitelist-good-actors \
+ && cp -a /etc/crowdsec/. /staging/etc/crowdsec/ \
  && cscli hub list
