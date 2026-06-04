@@ -60,8 +60,8 @@ build-ob-crowdsec:
       /kaniko/executor
       --context "${CI_PROJECT_DIR}/services/ob-crowdsec"
       --dockerfile "${CI_PROJECT_DIR}/services/ob-crowdsec/Dockerfile"
-      --destination "harbor.cp.bankdhofar.com/qantara/crowdsec-ob:${CI_COMMIT_SHORT_SHA}"
-      --destination "harbor.cp.bankdhofar.com/qantara/crowdsec-ob:latest"
+      --destination "${CI_REGISTRY_IMAGE}/crowdsec-ob:${CI_COMMIT_SHORT_SHA}"
+      --destination "${CI_REGISTRY_IMAGE}/crowdsec-ob:latest"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
