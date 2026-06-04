@@ -30,3 +30,5 @@ RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
  && cp -a /etc/crowdsec/. /staging/etc/crowdsec/ \
  && cscli parsers list \
  && cscli collections list
+
+# build trigger 2d10e8c

@@ -59,15 +59,15 @@ build-ob-crowdsec:
   <<: *build_template
   script:
     # Build a kaniko docker auth config with BOTH the GitLab registry (auto vars)
-    # and the Harbor qantara robot, so --destination can push to either.
+    # and the Harbor qantara robot, so --destination can push to either. Built
+    # with printf (no heredoc) to avoid shell re-scanning the robot username,
+    # which contains '$' and '+'.
     - mkdir -p /kaniko/.docker
-    - |
-      cat > /kaniko/.docker/config.json <<JSON
-      {"auths":{
-        "${CI_REGISTRY}":{"auth":"$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')"},
-        "harbor.cp.bankdhofar.com":{"auth":"$(printf '%s:%s' "$QANTARA_HARBOR_USER" "$QANTARA_HARBOR_PASSWORD" | base64 | tr -d '\n')"}
-      }}
-      JSON
+    - 'echo "diag: gitlab-user-len=${#CI_REGISTRY_USER} harbor-user-len=${#QANTARA_HARBOR_USER} harbor-pass-len=${#QANTARA_HARBOR_PASSWORD}"'
+    - GL_AUTH=$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')
+    - HB_AUTH=$(printf '%s:%s' "$QANTARA_HARBOR_USER" "$QANTARA_HARBOR_PASSWORD" | base64 | tr -d '\n')
+    - printf '{"auths":{"%s":{"auth":"%s"},"harbor.cp.bankdhofar.com":{"auth":"%s"}}}' "$CI_REGISTRY" "$GL_AUTH" "$HB_AUTH" > /kaniko/.docker/config.json
+    - 'echo "diag: harbor-auth-len=${#HB_AUTH}"'
     - >
       /kaniko/executor
       --context "${CI_PROJECT_DIR}/services/ob-crowdsec"
