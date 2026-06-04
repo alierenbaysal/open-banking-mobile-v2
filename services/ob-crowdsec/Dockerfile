@@ -1,21 +1,23 @@
 # CrowdSec image with the OB-edge collections/parsers BAKED IN at build time.
 #
-# WHY: the TND DMZ has no internet, so a stock crowdsec agent cannot
-# Istio/Envoy access-log parser (no crowdsecurity/ one exists)`cscli collections install` from hub.crowdsec.net at boot (it crashloops
-# "can't find crowdsecurity/envoy-logs in parsers"). GitLab CI runners DO have
-# internet, so we install the collections here, at build time, and ship a
-# self-contained image to Harbor. The agent then runs fully offline.
+# WHY: the TND DMZ has no internet, so a stock crowdsec agent cannot install
+# parsers/collections from hub.crowdsec.net at boot (it crashloops "can't find
+# ... in parsers"). GitLab CI runners DO have internet, so we install the
+# collections here, at build time, and ship a self-contained image. The agent
+# then runs fully offline with real OB-edge detection.
 FROM harbor.cp.bankdhofar.com/dockerhub/crowdsecurity/crowdsec:v1.6.9
 
 # The crowdsec image only materializes /etc/crowdsec at container START (its
 # entrypoint copies from /staging/etc/crowdsec). At BUILD time that dir is
 # empty, so cscli fails "open /etc/crowdsec/config.yaml: no such file". Seed the
-# config from the image's staging tree first, then install the hub content into
-# the baked layer. Both /etc/crowdsec and /staging/etc/crowdsec are populated so
-# the result survives the entrypoint's start-time copy either way.
+# config from staging first, install the hub content, then copy the populated
+# tree back into /staging so it survives the entrypoint's start-time copy.
+#
+# Parser note: the Istio/Envoy access-log parser is the community
+# "yanis-kouidri/envoy-logs" — there is no "crowdsecurity/envoy-logs".
 RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
  && cscli hub update \
- && cscli parsers install yanis-kouidri/envoy-logs Istio/Envoy access-log parser (no crowdsecurity/ one exists)`# Istio/Envoy access-log parser (no crowdsecurity/ one exists)` \
+ && cscli parsers install yanis-kouidri/envoy-logs \
  && cscli collections install \
       crowdsecurity/base-http-scenarios \
       crowdsecurity/http-cve \
