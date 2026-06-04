@@ -35,7 +35,13 @@ RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
         cp -a "/etc/crowdsec/$d" "/staging/etc/crowdsec/$d"; \
       fi; \
     done \
+ && cscli parsers list \
+ && cscli collections list \
  && rm -f /staging/etc/crowdsec/local_api_credentials.yaml \
            /staging/etc/crowdsec/online_api_credentials.yaml \
- && cscli parsers list \
- && cscli collections list
+ # CRITICAL: the chart's init container does `ln -s /staging/etc/crowdsec
+ # /etc/crowdsec` then `cscli lapi register`. That symlink only works if
+ # /etc/crowdsec does NOT exist. The stock image leaves it empty; our build
+ # populated it (for cscli), so empty it again — otherwise ln -s fails, the &&
+ # chain breaks, registration is lost, and agents get "machine not found".
+ && rm -rf /etc/crowdsec
