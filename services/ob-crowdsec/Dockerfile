@@ -5,20 +5,22 @@
 # ... in parsers"). GitLab CI runners DO have internet, so we install the
 # collections here, at build time, and ship a self-contained image. The agent
 # then runs fully offline with real OB-edge detection.
+#
+# RUNTIME CONTRACT with the crowdsec helm chart: its init container does
+#   ln -s /staging/etc/crowdsec /etc/crowdsec && cscli lapi register && \
+#   cp /etc/crowdsec/local_api_credentials.yaml /tmp_config/...
+# That symlink only works if /etc/crowdsec does NOT exist. The stock image keeps
+# /etc/crowdsec empty (the entrypoint populates it from /staging at start). So
+# we bake everything into /staging and leave /etc/crowdsec EMPTY — otherwise
+# ln -s fails, the && chain breaks, registration is lost, and the agent crashes
+# "machine not found".
+#
+# Envoy parser: the Istio/Envoy access-log parser is the community
+# "yanis-kouidri/envoy-logs" (v1.6.9's curated index doesn't resolve it), so we
+# drop the file in directly. We bake ONLY the hub content dirs into /staging
+# (not config.yaml / *_api_credentials.yaml, which the chart manages).
 FROM harbor.cp.bankdhofar.com/dockerhub/crowdsecurity/crowdsec:v1.6.9
 
-# The crowdsec image only materializes /etc/crowdsec at container START (its
-# entrypoint copies from /staging/etc/crowdsec). At BUILD time that dir is
-# empty, so seed it from staging first, install the hub content, then copy ONLY
-# the hub-CONTENT dirs back into /staging — NOT config.yaml or the *_api_
-# credentials.yaml. The helm chart's init container registers each agent to LAPI
-# and injects local_api_credentials.yaml; if we baked those config/credential
-# files into /staging the entrypoint's start-time copy would CLOBBER the
-# chart's registration creds → "machine not found". So bake hub content only.
-#
-# Envoy parser: the Istio/Envoy access-log parser is the COMMUNITY-authored
-# "yanis-kouidri/envoy-logs", which v1.6.9's curated `cscli hub` index does not
-# resolve; drop the parser file directly into the s01-parse stage.
 RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
  && cscli hub update \
  && mkdir -p /etc/crowdsec/parsers/s01-parse \
@@ -29,19 +31,13 @@ RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
       crowdsecurity/base-http-scenarios \
       crowdsecurity/http-cve \
       crowdsecurity/whitelist-good-actors \
+ && cscli parsers list \
+ && cscli collections list \
  && for d in hub parsers scenarios collections postoverflows patterns; do \
       if [ -e "/etc/crowdsec/$d" ]; then \
         rm -rf "/staging/etc/crowdsec/$d"; \
         cp -a "/etc/crowdsec/$d" "/staging/etc/crowdsec/$d"; \
       fi; \
     done \
- && cscli parsers list \
- && cscli collections list \
- && rm -f /staging/etc/crowdsec/local_api_credentials.yaml \
-           /staging/etc/crowdsec/online_api_credentials.yaml \
- # CRITICAL: the chart's init container does `ln -s /staging/etc/crowdsec
- # /etc/crowdsec` then `cscli lapi register`. That symlink only works if
- # /etc/crowdsec does NOT exist. The stock image leaves it empty; our build
- # populated it (for cscli), so empty it again — otherwise ln -s fails, the &&
- # chain breaks, registration is lost, and agents get "machine not found".
+ && rm -f /staging/etc/crowdsec/local_api_credentials.yaml /staging/etc/crowdsec/online_api_credentials.yaml \
  && rm -rf /etc/crowdsec
