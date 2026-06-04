@@ -1,7 +1,7 @@
 # CrowdSec image with the OB-edge collections/parsers BAKED IN at build time.
 #
 # WHY: the TND DMZ has no internet, so a stock crowdsec agent cannot
-# `cscli collections install` from hub.crowdsec.net at boot (it crashloops
+# Istio/Envoy access-log parser (no crowdsecurity/ one exists)`cscli collections install` from hub.crowdsec.net at boot (it crashloops
 # "can't find crowdsecurity/envoy-logs in parsers"). GitLab CI runners DO have
 # internet, so we install the collections here, at build time, and ship a
 # self-contained image to Harbor. The agent then runs fully offline.
@@ -15,7 +15,7 @@ FROM harbor.cp.bankdhofar.com/dockerhub/crowdsecurity/crowdsec:v1.6.9
 # the result survives the entrypoint's start-time copy either way.
 RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
  && cscli hub update \
- && cscli parsers install yanis-kouidri/envoy-logs `# Istio/Envoy access-log parser (no crowdsecurity/ one exists)` \
+ && cscli parsers install yanis-kouidri/envoy-logs Istio/Envoy access-log parser (no crowdsecurity/ one exists)`# Istio/Envoy access-log parser (no crowdsecurity/ one exists)` \
  && cscli collections install \
       crowdsecurity/base-http-scenarios \
       crowdsecurity/http-cve \
