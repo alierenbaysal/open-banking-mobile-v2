@@ -35,5 +35,7 @@ RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
         cp -a "/etc/crowdsec/$d" "/staging/etc/crowdsec/$d"; \
       fi; \
     done \
+ && rm -f /staging/etc/crowdsec/local_api_credentials.yaml \
+           /staging/etc/crowdsec/online_api_credentials.yaml \
  && cscli parsers list \
  && cscli collections list
