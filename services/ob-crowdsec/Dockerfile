@@ -15,7 +15,7 @@ FROM harbor.cp.bankdhofar.com/dockerhub/crowdsecurity/crowdsec:v1.6.9
 # the result survives the entrypoint's start-time copy either way.
 RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
  && cscli hub update \
- && cscli parsers install crowdsecurity/envoy-logs \
+ && cscli parsers install yanis-kouidri/envoy-logs `# Istio/Envoy access-log parser (no crowdsecurity/ one exists)` \
  && cscli collections install \
       crowdsecurity/base-http-scenarios \
       crowdsecurity/http-cve \
