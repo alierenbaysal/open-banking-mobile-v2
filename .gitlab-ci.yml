@@ -1,6 +1,8 @@
 stages:
   - mirror
   - build
+  - scan        # Phase 5 (#11) — Trivy HIGH/CRITICAL fixable-vuln gate per OB image
+  - sign        # Phase 5 (#11) — cosign key-based sign + self-verify of pushed digest
 
 variables:
   GIT_STRATEGY: clone
@@ -233,3 +235,278 @@ build-muscat-motors:
     - if: $CI_COMMIT_BRANCH =~ /^feature\/auto-loan/
       changes:
         - services/muscat-motors/**/*
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Phase 5 (#11) supply-chain gate — Trivy vuln scan + cosign signing.
+#
+# Scope: the Open Banking platform services (ob-*) whose images Kyverno governs
+# in the DMZ via the `require-signed-ob-images` ClusterPolicy (qantara/* images
+# in ob-* namespaces). For each ob-* image we:
+#   1. scan  — Trivy fails the pipeline on any HIGH/CRITICAL vuln that has a fix.
+#   2. sign  — cosign signs the pushed image BY DIGEST with the CI private key,
+#              then self-verifies with the public key.
+#
+# Tool images are pulled via the Harbor Docker Hub proxy (runners have no direct
+# Docker Hub access):
+#   harbor.cp.bankdhofar.com/dockerhub/aquasec/trivy:<ver>
+#   harbor.cp.bankdhofar.com/dockerhub/sigstore/cosign:<ver>
+#
+# Cosign KEY-BASED model (see infra
+# overlays/oci-bankdhofar-muscat-dmz/kyverno/SUPPLY_CHAIN_AND_SOD.md): the bank
+# clusters/CI have no guaranteed outbound to public Sigstore (Fulcio/Rekor), so
+# we use a held keypair and skip the transparency log.
+#
+# Secrets come ONLY from MASKED+PROTECTED GitLab CI variables — never hardcoded:
+#   COSIGN_KEY       — contents of cosign.key (the encrypted private key)
+#   COSIGN_PASSWORD  — password for that key
+# The matching cosign.pub goes into the Kyverno policy (or a kyverno-ns secret).
+#
+# ── Rollout / Kyverno Enforce dependency ────────────────────────────────────
+# The sign+verify jobs are GATED on $COSIGN_KEY being present, so this pipeline
+# stays green for normal builds until the team provisions the keypair. The
+# Kyverno `require-signed-ob-images` policy is currently in **Audit**. To flip
+# it to **Enforce** ALL of the following must be live FIRST, or every OB pod is
+# rejected:
+#   1. cosign keypair generated off any shared host.
+#   2. COSIGN_KEY + COSIGN_PASSWORD set as masked, protected CI vars on this
+#      project (ea/open-banking, id 431).
+#   3. cosign.pub wired into the Kyverno policy (publicKeys: inline, or
+#      k8s://kyverno/qantara-cosign-pub secret via ESO).
+#   4. At least one full pipeline run on main has signed each ob-* image, and the
+#      Kyverno PolicyReports show those images verifying under Audit.
+# Only then flip require-signed-ob-images validationFailureAction: Audit→Enforce.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Reusable Trivy image-vuln gate. Extend and set $IMAGE.
+.trivy_scan:
+  stage: scan
+  image:
+    name: harbor.cp.bankdhofar.com/dockerhub/aquasec/trivy:0.53.0
+    entrypoint: [""]
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: ".trivycache/"
+    # Auth to the GitLab registry so Trivy can pull the just-built image.
+    TRIVY_USERNAME: "$CI_REGISTRY_USER"
+    TRIVY_PASSWORD: "$CI_REGISTRY_PASSWORD"
+  script:
+    # Fail on any HIGH/CRITICAL OS/library vuln that has a fix available.
+    - >
+      trivy image
+      --severity HIGH,CRITICAL
+      --ignore-unfixed
+      --exit-code 1
+      --no-progress
+      "$IMAGE"
+  cache:
+    paths:
+      - .trivycache/
+  allow_failure: false
+
+# Reusable cosign sign-by-digest + self-verify. Extend and set $IMAGE_REPO
+# (image ref WITHOUT tag, e.g. $CI_REGISTRY_IMAGE/ob-api-server) and $IMAGE_TAG.
+.cosign_sign:
+  stage: sign
+  image:
+    name: harbor.cp.bankdhofar.com/dockerhub/sigstore/cosign:v2.2.4
+    entrypoint: [""]
+  variables:
+    COSIGN_YES: "true"   # non-interactive
+  script:
+    - |
+      set -e
+      REF="${IMAGE_REPO}:${IMAGE_TAG}"
+      # Authenticate cosign to the GitLab registry.
+      cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+      # Sign the image. cosign resolves the tag to its immutable digest and signs
+      # BY DIGEST (tags are mutable). Key-based; transparency-log upload disabled
+      # since the bank has no guaranteed outbound to public Sigstore/Rekor.
+      echo "Signing ${REF} by digest"
+      cosign sign --key env://COSIGN_KEY --tlog-upload=false "${REF}"
+      # Self-verify with the public key derived from the private key, so a
+      # mis-provisioned key fails HERE rather than later at Kyverno admission.
+      cosign public-key --key env://COSIGN_KEY > /tmp/cosign.pub
+      cosign verify --key /tmp/cosign.pub \
+        --insecure-ignore-tlog=true "${REF}"
+  rules:
+    # Only attempt signing once the keypair is provisioned as a CI variable.
+    # Until then the build+scan still run; signing is a no-op-skip (not a fail),
+    # which keeps the pipeline green pre-rollout. Mirrors each build job's rules.
+    - if: '$COSIGN_KEY == null || $COSIGN_KEY == ""'
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: false
+
+# ── ob-api-server ────────────────────────────────────────────────────────────
+scan-ob-api-server:
+  extends: .trivy_scan
+  needs: ["build-ob-api-server"]
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}/ob-api-server:${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-api-server/**/*
+
+sign-ob-api-server:
+  extends: .cosign_sign
+  needs: ["scan-ob-api-server"]
+  variables:
+    IMAGE_REPO: "${CI_REGISTRY_IMAGE}/ob-api-server"
+    IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: '$COSIGN_KEY == null || $COSIGN_KEY == ""'
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-api-server/**/*
+
+# ── ob-consent-service ───────────────────────────────────────────────────────
+scan-ob-consent-service:
+  extends: .trivy_scan
+  needs: ["build-ob-consent-service"]
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}/ob-consent-service:${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-consent-service/**/*
+
+sign-ob-consent-service:
+  extends: .cosign_sign
+  needs: ["scan-ob-consent-service"]
+  variables:
+    IMAGE_REPO: "${CI_REGISTRY_IMAGE}/ob-consent-service"
+    IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: '$COSIGN_KEY == null || $COSIGN_KEY == ""'
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-consent-service/**/*
+
+# ── ob-loan-service ──────────────────────────────────────────────────────────
+scan-ob-loan-service:
+  extends: .trivy_scan
+  needs: ["build-ob-loan-service"]
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}/ob-loan-service:${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-loan-service/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/auto-loan/
+      changes:
+        - services/ob-loan-service/**/*
+
+sign-ob-loan-service:
+  extends: .cosign_sign
+  needs: ["scan-ob-loan-service"]
+  variables:
+    IMAGE_REPO: "${CI_REGISTRY_IMAGE}/ob-loan-service"
+    IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: '$COSIGN_KEY == null || $COSIGN_KEY == ""'
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-loan-service/**/*
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/auto-loan/
+      changes:
+        - services/ob-loan-service/**/*
+
+# ── ob-tpp-manager ───────────────────────────────────────────────────────────
+scan-ob-tpp-manager:
+  extends: .trivy_scan
+  needs: ["build-ob-tpp-manager"]
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}/ob-tpp-manager:${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-tpp-manager/**/*
+
+sign-ob-tpp-manager:
+  extends: .cosign_sign
+  needs: ["scan-ob-tpp-manager"]
+  variables:
+    IMAGE_REPO: "${CI_REGISTRY_IMAGE}/ob-tpp-manager"
+    IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: '$COSIGN_KEY == null || $COSIGN_KEY == ""'
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-tpp-manager/**/*
+
+# ── ob-event-service ─────────────────────────────────────────────────────────
+scan-ob-event-service:
+  extends: .trivy_scan
+  needs: ["build-ob-event-service"]
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}/ob-event-service:${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-event-service/**/*
+
+sign-ob-event-service:
+  extends: .cosign_sign
+  needs: ["scan-ob-event-service"]
+  variables:
+    IMAGE_REPO: "${CI_REGISTRY_IMAGE}/ob-event-service"
+    IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: '$COSIGN_KEY == null || $COSIGN_KEY == ""'
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-event-service/**/*
+
+# ── ob-theqa-service ─────────────────────────────────────────────────────────
+scan-ob-theqa-service:
+  extends: .trivy_scan
+  needs: ["build-ob-theqa-service"]
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}/ob-theqa-service:${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-theqa-service/**/*
+
+sign-ob-theqa-service:
+  extends: .cosign_sign
+  needs: ["scan-ob-theqa-service"]
+  variables:
+    IMAGE_REPO: "${CI_REGISTRY_IMAGE}/ob-theqa-service"
+    IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: '$COSIGN_KEY == null || $COSIGN_KEY == ""'
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-theqa-service/**/*
+
+# ── ob-portal ────────────────────────────────────────────────────────────────
+scan-ob-portal:
+  extends: .trivy_scan
+  needs: ["build-ob-portal"]
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}/ob-portal:${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-portal/**/*
+
+sign-ob-portal:
+  extends: .cosign_sign
+  needs: ["scan-ob-portal"]
+  variables:
+    IMAGE_REPO: "${CI_REGISTRY_IMAGE}/ob-portal"
+    IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: '$COSIGN_KEY == null || $COSIGN_KEY == ""'
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - services/ob-portal/**/*
