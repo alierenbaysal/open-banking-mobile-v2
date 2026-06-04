@@ -9,14 +9,16 @@ FROM harbor.cp.bankdhofar.com/dockerhub/crowdsecurity/crowdsec:v1.6.9
 
 # The crowdsec image only materializes /etc/crowdsec at container START (its
 # entrypoint copies from /staging/etc/crowdsec). At BUILD time that dir is
-# empty, so cscli fails "open /etc/crowdsec/config.yaml: no such file". Seed the
-# config from staging first.
+# empty, so seed it from staging first, install the hub content, then copy ONLY
+# the hub-CONTENT dirs back into /staging — NOT config.yaml or the *_api_
+# credentials.yaml. The helm chart's init container registers each agent to LAPI
+# and injects local_api_credentials.yaml; if we baked those config/credential
+# files into /staging the entrypoint's start-time copy would CLOBBER the
+# chart's registration creds → "machine not found". So bake hub content only.
 #
 # Envoy parser: the Istio/Envoy access-log parser is the COMMUNITY-authored
 # "yanis-kouidri/envoy-logs", which v1.6.9's curated `cscli hub` index does not
-# resolve ("can't find ... in parsers"). So drop the parser file directly into
-# the s01-parse stage from the hub repo (CI runner has internet). The
-# crowdsecurity/* collections below DO resolve via cscli normally.
+# resolve; drop the parser file directly into the s01-parse stage.
 RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
  && cscli hub update \
  && mkdir -p /etc/crowdsec/parsers/s01-parse \
@@ -27,8 +29,11 @@ RUN cp -a /staging/etc/crowdsec/. /etc/crowdsec/ \
       crowdsecurity/base-http-scenarios \
       crowdsecurity/http-cve \
       crowdsecurity/whitelist-good-actors \
- && cp -a /etc/crowdsec/. /staging/etc/crowdsec/ \
+ && for d in hub parsers scenarios collections postoverflows patterns; do \
+      if [ -e "/etc/crowdsec/$d" ]; then \
+        rm -rf "/staging/etc/crowdsec/$d"; \
+        cp -a "/etc/crowdsec/$d" "/staging/etc/crowdsec/$d"; \
+      fi; \
+    done \
  && cscli parsers list \
  && cscli collections list
-
-# build trigger 2d10e8c
