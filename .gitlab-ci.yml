@@ -50,18 +50,32 @@ build-ob-api-server:
         - services/ob-api-server/**/*
 
 # Phase 3 (#9) — CrowdSec image with OB-edge collections baked in at build time
-# (CI runners have internet; the DMZ does not). Pushed to the qantara Harbor
-# project; the dmz crowdsec agent then runs fully offline with real OB-edge
-# detection. Destination uses the qantara registry namespace explicitly.
+# (CI runners have internet; the DMZ does not). Pushed to BOTH the GitLab
+# registry (audit/consistency) AND the Harbor `qantara` project — the isolated
+# DMZ can only resolve harbor.cp.bankdhofar.com, NOT registry.bankdhofar.com, so
+# the agent image MUST be in Harbor. kaniko authenticates to Harbor with the
+# project-scoped robot `robot$qantara+qantara-ci` (QANTARA_HARBOR_* CI vars).
 build-ob-crowdsec:
   <<: *build_template
   script:
+    # Build a kaniko docker auth config with BOTH the GitLab registry (auto vars)
+    # and the Harbor qantara robot, so --destination can push to either.
+    - mkdir -p /kaniko/.docker
+    - |
+      cat > /kaniko/.docker/config.json <<JSON
+      {"auths":{
+        "${CI_REGISTRY}":{"auth":"$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')"},
+        "harbor.cp.bankdhofar.com":{"auth":"$(printf '%s:%s' "$QANTARA_HARBOR_USER" "$QANTARA_HARBOR_PASSWORD" | base64 | tr -d '\n')"}
+      }}
+      JSON
     - >
       /kaniko/executor
       --context "${CI_PROJECT_DIR}/services/ob-crowdsec"
       --dockerfile "${CI_PROJECT_DIR}/services/ob-crowdsec/Dockerfile"
       --destination "${CI_REGISTRY_IMAGE}/crowdsec-ob:${CI_COMMIT_SHORT_SHA}"
       --destination "${CI_REGISTRY_IMAGE}/crowdsec-ob:latest"
+      --destination "harbor.cp.bankdhofar.com/qantara/crowdsec-ob:${CI_COMMIT_SHORT_SHA}"
+      --destination "harbor.cp.bankdhofar.com/qantara/crowdsec-ob:latest"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
