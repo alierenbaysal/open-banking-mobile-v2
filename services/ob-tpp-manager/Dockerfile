@@ -1,9 +1,9 @@
 FROM harbor.cp.bankdhofar.com/dockerhub/python:3.12-slim AS builder
 
 RUN apt-get update && apt-get install -y wget ca-certificates git && \
-    wget -q https://go.dev/dl/go1.22.12.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.22.12.linux-amd64.tar.gz && \
-    rm go1.22.12.linux-amd64.tar.gz && \
+    wget -q https://go.dev/dl/go1.25.11.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.25.11.linux-amd64.tar.gz && \
+    rm go1.25.11.linux-amd64.tar.gz && \
     rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/usr/local/go/bin:${PATH}"
