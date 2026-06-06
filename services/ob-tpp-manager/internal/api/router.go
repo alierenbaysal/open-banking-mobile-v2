@@ -1,45 +1,60 @@
 package api
 
 import (
-	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-
-	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/certs"
-	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/keycloak"
 )
 
 // NewRouter creates and configures the Chi router with all middleware and routes.
-func NewRouter(kc *keycloak.Client, certMgr *certs.Manager, consentServiceURL string, logger *slog.Logger) http.Handler {
-	h := NewHandler(kc, certMgr, consentServiceURL, logger)
+func NewRouter(d Deps) http.Handler {
+	h := NewHandler(d)
 
 	go h.SyncFromConsentService()
 
 	r := chi.NewRouter()
 
 	// Global middleware stack.
-	r.Use(Recoverer(logger))
-	r.Use(RequestLogger(logger))
+	r.Use(Recoverer(d.Logger))
+	r.Use(RequestLogger(d.Logger))
 	r.Use(CORS())
 	r.Use(ContentTypeJSON())
 
-	// Health check (outside /portal-api/tpp prefix).
+	// Health check.
 	r.Get("/portal-api/health", h.Health)
 
-	// TPP management routes.
+	// Partner self-service authentication (BFF). Keycloak is never exposed —
+	// every screen is native Qantara UI driven by these endpoints.
+	r.Route("/portal-api/auth", func(r chi.Router) {
+		r.Post("/invite", h.requireAdmin(h.Invite)) // admin session or X-Admin-Key
+		r.Post("/verify-pin", h.VerifyPIN)
+		r.Post("/set-password", h.SetPassword)
+		r.Post("/totp/init", h.TOTPInit)
+		r.Post("/totp/verify", h.TOTPVerify)
+		r.Post("/login", h.Login)
+		r.Post("/logout", h.Logout)
+		r.Get("/me", h.requireSession(h.Me))
+	})
+
+	// Internal reconciler view consumed by the DMZ gateway-config CronJob.
+	r.Get("/portal-api/internal/gateway-config", h.requireReconciler(h.GatewayConfig))
+
+	// TPP management + self-service (session-protected).
 	r.Route("/portal-api/tpp", func(r chi.Router) {
-		r.Post("/register", h.Register)
-		r.Get("/", h.ListTPPs)
+		r.Post("/register", h.requireSession(h.Register))
+		r.Get("/", h.requireSession(h.ListTPPs))
 
 		r.Route("/{tppId}", func(r chi.Router) {
-			r.Get("/", h.GetTPP)
-			r.Put("/", h.UpdateTPP)
-			r.Delete("/", h.SuspendTPP)
-			r.Post("/credentials", h.GenerateCredentials)
-			r.Post("/certificate", h.UploadCertificate)
-			r.Get("/certificate", h.GetCertificate)
-			r.Post("/sandbox-token", h.GenerateSandboxToken)
+			r.Get("/", h.requireSession(h.GetTPP))
+			r.Put("/", h.requireSession(h.UpdateTPP))
+			r.Delete("/", h.requireSession(h.SuspendTPP))
+			r.Post("/credentials", h.requireSession(h.GenerateCredentials))
+			r.Post("/certificate", h.requireSession(h.UploadCertificate))
+			r.Get("/certificate", h.requireSession(h.GetCertificate))
+			r.Post("/certificate/generate", h.requireSession(h.GenerateCert))
+			r.Post("/sandbox-token", h.requireSession(h.GenerateSandboxToken))
+			r.Get("/ip-allowlist", h.requireSession(h.GetIPAllowlist))
+			r.Put("/ip-allowlist", h.requireSession(h.SetIPAllowlist))
 		})
 	})
 

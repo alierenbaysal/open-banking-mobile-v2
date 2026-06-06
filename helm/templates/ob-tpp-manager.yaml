@@ -46,6 +46,54 @@ spec:
               value: {{ .Values.tppManager.env.CONSENT_SERVICE_URL | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.tppManager.env.LOG_LEVEL | quote }}
+            - name: BFF_CLIENT_ID
+              value: {{ .Values.tppManager.env.BFF_CLIENT_ID | quote }}
+            - name: PORTAL_BASE_URL
+              value: {{ .Values.tppManager.env.PORTAL_BASE_URL | quote }}
+            - name: SMTP_HOST
+              value: {{ .Values.tppManager.env.SMTP_HOST | quote }}
+            - name: SMTP_PORT
+              value: {{ .Values.tppManager.env.SMTP_PORT | quote }}
+            - name: SMTP_FROM
+              value: {{ .Values.tppManager.env.SMTP_FROM | quote }}
+            - name: SMTP_FROM_NAME
+              value: {{ .Values.tppManager.env.SMTP_FROM_NAME | quote }}
+            - name: SMTP_IMPLICIT_TLS
+              value: {{ .Values.tppManager.env.SMTP_IMPLICIT_TLS | quote }}
+            - name: SMTP_INSECURE
+              value: {{ .Values.tppManager.env.SMTP_INSECURE | quote }}
+            # Secrets (synced from Vault via ExternalSecret qantara-portal-secrets).
+            # optional:true so the pod still starts before the Vault entry is seeded.
+            - name: SMTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: smtp_username
+                  optional: true
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: smtp_password
+                  optional: true
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: session_secret
+                  optional: true
+            - name: ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: admin_api_key
+                  optional: true
+            - name: RECONCILER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: reconciler_api_key
+                  optional: true
           resources:
             {{- toYaml .Values.tppManager.resources | nindent 12 }}
           readinessProbe:

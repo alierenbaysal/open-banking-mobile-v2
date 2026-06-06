@@ -16,18 +16,44 @@ import (
 
 	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/certs"
 	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/keycloak"
+	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/mailer"
 	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/models"
+	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/session"
 )
+
+// Deps bundles everything the handler needs (keeps constructor signatures stable
+// as the self-service BFF grows).
+type Deps struct {
+	KC                *keycloak.Client
+	CertMgr           *certs.Manager
+	Mailer            *mailer.Mailer
+	Signer            *session.Signer
+	ConsentServiceURL string
+	BFFClientID       string
+	BFFClientSecret   string
+	PortalBaseURL     string
+	AdminAPIKey       string
+	ReconcilerAPIKey  string
+	Logger            *slog.Logger
+}
 
 // Handler holds all HTTP handler dependencies.
 type Handler struct {
 	kc                *keycloak.Client
 	certMgr           *certs.Manager
+	mailer            *mailer.Mailer
+	signer            *session.Signer
 	consentServiceURL string
+	bffClientID       string
+	bffClientSecret   string
+	portalBaseURL     string
+	adminAPIKey       string
+	reconcilerAPIKey  string
 	logger            *slog.Logger
 
-	// In-memory TPP store. In production this would be backed by a database;
-	// the consent-service's TPP registry is the persistent store.
+	// In-memory TPP store. The consent-service TPP registry is the persistent
+	// store; per-TPP edge state (thumbprints, IP allowlist) lives as Keycloak
+	// client attributes.
 	mu   sync.RWMutex
 	tpps map[string]*models.TPP
 	// Maps clientID → Keycloak internal UUID for secret operations.
@@ -35,12 +61,19 @@ type Handler struct {
 }
 
 // NewHandler creates a handler with all required dependencies.
-func NewHandler(kc *keycloak.Client, certMgr *certs.Manager, consentServiceURL string, logger *slog.Logger) *Handler {
+func NewHandler(d Deps) *Handler {
 	return &Handler{
-		kc:                kc,
-		certMgr:           certMgr,
-		consentServiceURL: consentServiceURL,
-		logger:            logger,
+		kc:                d.KC,
+		certMgr:           d.CertMgr,
+		mailer:            d.Mailer,
+		signer:            d.Signer,
+		consentServiceURL: d.ConsentServiceURL,
+		bffClientID:       d.BFFClientID,
+		bffClientSecret:   d.BFFClientSecret,
+		portalBaseURL:     d.PortalBaseURL,
+		adminAPIKey:       d.AdminAPIKey,
+		reconcilerAPIKey:  d.ReconcilerAPIKey,
+		logger:            d.Logger,
 		tpps:              make(map[string]*models.TPP),
 		kcIDs:             make(map[string]string),
 	}
@@ -371,25 +404,15 @@ func (h *Handler) UploadCertificate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Upload to Keycloak for mTLS binding.
-	h.mu.RLock()
-	kcID := h.kcIDs[tpp.ClientID]
-	h.mu.RUnlock()
-
-	if kcID != "" {
-		if err := h.kc.UploadClientCertificate(kcID, req.CertificatePEM); err != nil {
-			h.logger.Error("failed to upload certificate to keycloak", "error", err, "tpp_id", tppID)
-			writeError(w, http.StatusBadGateway, "keycloak_error",
-				"Certificate valid but Keycloak upload failed: "+err.Error())
-			return
-		}
+	// Bring-your-own is the normal trust path: pin the thumbprint, store the
+	// anchor for the gateway trust bundle, enable cert-bound tokens, and upload
+	// the cert to Keycloak. pinCertToClient also updates the in-memory record.
+	if err := h.pinCertToClient(tpp.ClientID, certInfo, req.CertificatePEM); err != nil {
+		h.logger.Error("failed to pin certificate", "error", err, "tpp_id", tppID)
+		writeError(w, http.StatusBadGateway, "keycloak_error",
+			"Certificate valid but pinning failed: "+err.Error())
+		return
 	}
-
-	// Store certificate metadata on the TPP record.
-	h.mu.Lock()
-	tpp.Certificate = certInfo
-	tpp.UpdatedAt = time.Now().UTC()
-	h.mu.Unlock()
 
 	h.logger.Info("uploaded certificate for TPP",
 		"tpp_id", tppID,

@@ -8,25 +8,57 @@ import (
 
 // Config holds all application configuration loaded from environment variables.
 type Config struct {
-	Port                    string
-	KeycloakURL             string
-	KeycloakRealm           string
-	KeycloakAdminClientID   string
+	Port                      string
+	KeycloakURL               string
+	KeycloakRealm             string
+	KeycloakAdminClientID     string
 	KeycloakAdminClientSecret string
-	ConsentServiceURL       string
-	LogLevel                string
+	ConsentServiceURL         string
+	LogLevel                  string
+
+	// Partner self-service BFF.
+	BFFClientID      string
+	PortalBaseURL    string
+	SessionSecret    string
+	AdminAPIKey      string
+	ReconcilerAPIKey string
+
+	// SMTP (Stalwart relay) for invites + magic PINs.
+	SMTPHost        string
+	SMTPPort        string
+	SMTPUsername    string
+	SMTPPassword    string
+	SMTPFrom        string
+	SMTPFromName    string
+	SMTPImplicitTLS bool
+	SMTPInsecure    bool
 }
 
 // Load reads configuration from environment variables with sensible defaults.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Port:                    envOrDefault("PORT", "8000"),
-		KeycloakURL:             os.Getenv("KEYCLOAK_URL"),
-		KeycloakRealm:           envOrDefault("KEYCLOAK_REALM", "open-banking"),
-		KeycloakAdminClientID:   os.Getenv("KEYCLOAK_ADMIN_CLIENT_ID"),
+		Port:                      envOrDefault("PORT", "8000"),
+		KeycloakURL:               os.Getenv("KEYCLOAK_URL"),
+		KeycloakRealm:             envOrDefault("KEYCLOAK_REALM", "open-banking"),
+		KeycloakAdminClientID:     os.Getenv("KEYCLOAK_ADMIN_CLIENT_ID"),
 		KeycloakAdminClientSecret: os.Getenv("KEYCLOAK_ADMIN_CLIENT_SECRET"),
-		ConsentServiceURL:       envOrDefault("CONSENT_SERVICE_URL", "http://ob-consent-service:8000"),
-		LogLevel:                envOrDefault("LOG_LEVEL", "info"),
+		ConsentServiceURL:         envOrDefault("CONSENT_SERVICE_URL", "http://ob-consent-service:8000"),
+		LogLevel:                  envOrDefault("LOG_LEVEL", "info"),
+
+		BFFClientID:      envOrDefault("BFF_CLIENT_ID", "qantara-portal-bff"),
+		PortalBaseURL:    envOrDefault("PORTAL_BASE_URL", "https://qantara.tnd.bankdhofar.com"),
+		SessionSecret:    os.Getenv("SESSION_SECRET"),
+		AdminAPIKey:      os.Getenv("ADMIN_API_KEY"),
+		ReconcilerAPIKey: os.Getenv("RECONCILER_API_KEY"),
+
+		SMTPHost:        os.Getenv("SMTP_HOST"),
+		SMTPPort:        envOrDefault("SMTP_PORT", "587"),
+		SMTPUsername:    os.Getenv("SMTP_USERNAME"),
+		SMTPPassword:    os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:        envOrDefault("SMTP_FROM", "qantara@bankdhofar.dev"),
+		SMTPFromName:    envOrDefault("SMTP_FROM_NAME", "Qantara Open Banking"),
+		SMTPImplicitTLS: os.Getenv("SMTP_IMPLICIT_TLS") == "true",
+		SMTPInsecure:    os.Getenv("SMTP_INSECURE") == "true",
 	}
 
 	var missing []string

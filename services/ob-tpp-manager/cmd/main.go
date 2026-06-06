@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,6 +17,8 @@ import (
 	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/certs"
 	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/config"
 	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/keycloak"
+	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/mailer"
+	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/session"
 )
 
 func main() {
@@ -44,9 +48,53 @@ func main() {
 		logger,
 	)
 	certMgr := certs.NewManager()
+	mail := mailer.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword,
+		cfg.SMTPFrom, cfg.SMTPFromName, cfg.SMTPImplicitTLS, cfg.SMTPInsecure)
+	if mail.Enabled() {
+		logger.Info("SMTP configured", "host", cfg.SMTPHost, "from", cfg.SMTPFrom)
+	} else {
+		logger.Warn("SMTP not configured (SMTP_HOST unset) — invites return a dev PIN instead of emailing")
+	}
+
+	sessionSecret := cfg.SessionSecret
+	if sessionSecret == "" {
+		buf := make([]byte, 32)
+		_, _ = rand.Read(buf)
+		sessionSecret = hex.EncodeToString(buf)
+		logger.Warn("SESSION_SECRET not set — generated an ephemeral secret; set it via a K8s secret for multi-replica session validity")
+	}
+	signer := session.NewSigner(sessionSecret)
+
+	// Bootstrap Keycloak: ensure the partner roles and the confidential portal
+	// BFF client (direct access grants) exist. Idempotent; tolerant of Keycloak
+	// being briefly unreachable at startup.
+	if err := kcClient.EnsureRealmRole("tpp-developer"); err != nil {
+		logger.Warn("could not ensure realm role tpp-developer", "error", err)
+	}
+	if err := kcClient.EnsureRealmRole("qantara-admin"); err != nil {
+		logger.Warn("could not ensure realm role qantara-admin", "error", err)
+	}
+	bffUUID, bffSecret, err := kcClient.EnsureBFFClient(cfg.BFFClientID)
+	if err != nil {
+		logger.Error("could not ensure portal BFF client — partner login unavailable until Keycloak is reachable", "error", err)
+	} else {
+		logger.Info("portal BFF client ready", "client_id", cfg.BFFClientID, "kc_id", bffUUID)
+	}
 
 	// Build router.
-	router := api.NewRouter(kcClient, certMgr, cfg.ConsentServiceURL, logger)
+	router := api.NewRouter(api.Deps{
+		KC:                kcClient,
+		CertMgr:           certMgr,
+		Mailer:            mail,
+		Signer:            signer,
+		ConsentServiceURL: cfg.ConsentServiceURL,
+		BFFClientID:       cfg.BFFClientID,
+		BFFClientSecret:   bffSecret,
+		PortalBaseURL:     cfg.PortalBaseURL,
+		AdminAPIKey:       cfg.AdminAPIKey,
+		ReconcilerAPIKey:  cfg.ReconcilerAPIKey,
+		Logger:            logger,
+	})
 
 	// Configure HTTP server.
 	srv := &http.Server{

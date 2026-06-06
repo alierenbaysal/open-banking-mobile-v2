@@ -47,6 +47,15 @@ tppManager:
     KEYCLOAK_REALM: "open-banking"
     CONSENT_SERVICE_URL: "http://ob-consent-service:8000"
     LOG_LEVEL: "info"
+    BFF_CLIENT_ID: "qantara-portal-bff"
+    PORTAL_BASE_URL: "https://qantara.tnd.bankdhofar.com"
+    # Stalwart relay (same server GitLab uses; bankdhofar.dev has SPF/DKIM/DMARC).
+    SMTP_HOST: "mx.bankdhofar.dev"
+    SMTP_PORT: "587"
+    SMTP_FROM: "qantara@bankdhofar.dev"
+    SMTP_FROM_NAME: "Qantara Open Banking"
+    SMTP_IMPLICIT_TLS: "false"
+    SMTP_INSECURE: "true"
   resources:
     requests:
       cpu: 50m
