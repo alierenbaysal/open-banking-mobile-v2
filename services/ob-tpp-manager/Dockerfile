@@ -1,5 +1,5 @@
 # Go 1.25.11: patched toolchain (clears crypto/tls, crypto/x509, net/http stdlib
-# CVEs flagged by the Trivy gate); go.mod still targets 1.22.
+# CVEs flagged by the Trivy gate); go.mod still targets 1.22. CI build path only.
 FROM harbor.cp.bankdhofar.com/dockerhub/python:3.12-slim AS builder
 
 RUN apt-get update && apt-get install -y wget ca-certificates git && \
