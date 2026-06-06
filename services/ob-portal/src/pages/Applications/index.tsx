@@ -20,6 +20,8 @@ import {
   Tooltip,
   Code,
   Divider,
+  Center,
+  Loader,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useState, useCallback } from 'react';
@@ -127,7 +129,7 @@ function generateClientSecret(): string {
 }
 
 export default function ApplicationsPage() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [apps, setApps] = useState<TppApplication[]>(() => getAllAppsFromStore());
   const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
@@ -226,6 +228,16 @@ export default function ApplicationsPage() {
     }
   }, [createdCredentials, closeCredentials, navigate]);
 
+  if (authLoading) {
+    return (
+      <Container size="lg">
+        <Center py={80}>
+          <Loader color="bankGreen" />
+        </Center>
+      </Container>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <Container size="lg">
@@ -237,8 +249,13 @@ export default function ApplicationsPage() {
             <Title order={3}>Sign In Required</Title>
             <Text c="dimmed" maw={400}>
               You need to sign in to manage your TPP applications.
-              Use the Sign In button in the top right corner.
             </Text>
+            <Group>
+              <Button onClick={() => navigate('/login')}>Sign In</Button>
+              <Button variant="light" onClick={() => navigate('/activate')}>
+                Activate Account
+              </Button>
+            </Group>
           </Stack>
         </Card>
       </Container>

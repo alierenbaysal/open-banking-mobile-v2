@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { theme } from './theme';
 import { AppShell } from './components/layout/AppShell';
+import { AuthProvider } from './components/auth/AuthProvider';
 
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
@@ -17,6 +18,9 @@ import ApplicationsPage from './pages/Applications';
 import AppDetailPage from './pages/Applications/AppDetail';
 import AnalyticsPage from './pages/Analytics';
 import GettingStarted from './pages/Content/GettingStarted';
+import LoginPage from './pages/Auth/Login';
+import ActivatePage from './pages/Auth/Activate';
+import InvitationsPage from './pages/Admin/Invitations';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,18 +38,23 @@ export default function App() {
       <MantineProvider theme={theme} defaultColorScheme="light">
         <Notifications position="top-right" />
         <BrowserRouter>
-          <Routes>
-            <Route element={<AppShell />}>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/apis" element={<ApiCatalog />} />
-              <Route path="/apis/:groupId" element={<ApiDetail />} />
-              <Route path="/sandbox" element={<SandboxPage />} />
-              <Route path="/applications" element={<ApplicationsPage />} />
-              <Route path="/applications/:appId" element={<AppDetailPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/getting-started" element={<GettingStarted />} />
-            </Route>
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/apis" element={<ApiCatalog />} />
+                <Route path="/apis/:groupId" element={<ApiDetail />} />
+                <Route path="/sandbox" element={<SandboxPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/activate" element={<ActivatePage />} />
+                <Route path="/applications" element={<ApplicationsPage />} />
+                <Route path="/applications/:appId" element={<AppDetailPage />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/admin/invitations" element={<InvitationsPage />} />
+                <Route path="/getting-started" element={<GettingStarted />} />
+              </Route>
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </MantineProvider>
     </QueryClientProvider>

@@ -246,15 +246,38 @@ export default function GettingStarted() {
               To start building with Bank Dhofar's Open Banking APIs, you need a developer account.
             </Text>
             <List size="sm" spacing="xs">
-              <List.Item>Click the "Sign In" button in the top-right corner of the portal</List.Item>
-              <List.Item>Enter your name, email, and organization details</List.Item>
-              <List.Item>For sandbox access, any valid email will work immediately</List.Item>
-              <List.Item>For production access, your TPP must be registered with the Central Bank of Oman</List.Item>
+              <List.Item>Bank Dhofar invites partners by email with a one-time activation PIN</List.Item>
+              <List.Item>
+                Open the <Anchor onClick={() => navigate('/activate')}>account activation</Anchor> page and
+                enter your email and PIN
+              </List.Item>
+              <List.Item>Set a password and enrol an authenticator app (TOTP) to secure your account</List.Item>
+              <List.Item>
+                Once activated, <Anchor onClick={() => navigate('/login')}>sign in</Anchor> with your
+                password and 6-digit code
+              </List.Item>
             </List>
+            <Group mt="sm">
+              <Button
+                size="sm"
+                rightSection={<IconArrowRight size={14} />}
+                onClick={() => navigate('/activate')}
+              >
+                Activate your account
+              </Button>
+              <Button
+                size="sm"
+                variant="light"
+                rightSection={<IconArrowRight size={14} />}
+                onClick={() => navigate('/login')}
+              >
+                Sign in
+              </Button>
+            </Group>
             <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" mt="sm">
               <Text size="sm">
-                <strong>Sandbox accounts</strong> are provisioned instantly with full API access.
-                No approval required for testing.
+                Don't have an invitation yet? Contact your Bank Dhofar relationship manager to be
+                invited to the Qantara developer portal.
               </Text>
             </Alert>
           </Stack>

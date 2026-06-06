@@ -11,6 +11,7 @@ import {
   Box,
   Badge,
   Divider,
+  Anchor,
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -171,6 +172,15 @@ export default function LandingPage() {
               >
                 Explore APIs
               </Button>
+            </Group>
+            <Group gap="xs" mt={4}>
+              <Anchor c="white" fw={500} onClick={() => navigate('/login')} style={{ opacity: 0.95 }}>
+                Sign in
+              </Anchor>
+              <Text c="white" style={{ opacity: 0.7 }}>·</Text>
+              <Anchor c="white" fw={500} onClick={() => navigate('/activate')} style={{ opacity: 0.95 }}>
+                Activate your invitation
+              </Anchor>
             </Group>
           </Stack>
         </Container>

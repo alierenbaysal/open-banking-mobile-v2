@@ -226,9 +226,6 @@ export default function ApiDetail() {
               </ThemeIcon>
               <div>
                 <Title order={2}>{group.name}</Title>
-                <Text size="sm" c="dimmed" dir="rtl" style={{ fontFamily: 'serif' }}>
-                  {group.nameAr}
-                </Text>
               </div>
             </Group>
             <Text c="dimmed" mt="xs" maw={700}>{group.description}</Text>

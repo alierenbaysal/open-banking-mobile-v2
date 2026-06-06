@@ -11,6 +11,8 @@ export interface ApiError {
   status: number;
   statusText: string;
   message: string;
+  /** Raw parsed response body (when JSON) — lets callers read backend codes like `invalid_login`. */
+  body?: unknown;
 }
 
 async function request<T = unknown>(
@@ -22,14 +24,11 @@ async function request<T = unknown>(
     ...(options.headers as Record<string, string> || {}),
   };
 
-  const token = sessionStorage.getItem('qantara_access_token');
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
+  // Session is a httpOnly cookie set by the BFF — every request must send it.
   const response = await fetch(`${BASE_URL}${url}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   const responseHeaders: Record<string, string> = {};
@@ -52,6 +51,7 @@ async function request<T = unknown>(
       message: typeof data === 'object' && data !== null && 'message' in data
         ? String((data as Record<string, unknown>).message)
         : response.statusText,
+      body: data,
     };
     throw error;
   }

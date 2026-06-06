@@ -7,15 +7,17 @@ import {
   IconApps,
   IconChartBar,
   IconBook,
+  IconMailForward,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const NAV_ITEMS = [
-  { label: 'Home', icon: IconHome, path: '/', auth: false },
-  { label: 'API Catalog', icon: IconApi, path: '/apis', auth: false },
-  { label: 'Sandbox', icon: IconTerminal2, path: '/sandbox', auth: false },
-  { label: 'My Applications', icon: IconApps, path: '/applications', auth: true },
-  { label: 'Analytics', icon: IconChartBar, path: '/analytics', auth: true },
+  { label: 'Home', icon: IconHome, path: '/', auth: false, admin: false },
+  { label: 'API Catalog', icon: IconApi, path: '/apis', auth: false, admin: false },
+  { label: 'Sandbox', icon: IconTerminal2, path: '/sandbox', auth: false, admin: false },
+  { label: 'My Applications', icon: IconApps, path: '/applications', auth: true, admin: false },
+  { label: 'Analytics', icon: IconChartBar, path: '/analytics', auth: true, admin: false },
+  { label: 'Invitations', icon: IconMailForward, path: '/admin/invitations', auth: true, admin: true },
 ];
 
 const RESOURCE_ITEMS = [
@@ -25,7 +27,7 @@ const RESOURCE_ITEMS = [
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
 
   return (
     <Stack gap={0} py="md">
@@ -34,6 +36,7 @@ export function Sidebar() {
       </Text>
       {NAV_ITEMS.map((item) => {
         if (item.auth && !isAuthenticated) return null;
+        if (item.admin && !isAdmin) return null;
         const isActive = item.path === '/'
           ? location.pathname === '/'
           : location.pathname.startsWith(item.path);
