@@ -281,7 +281,7 @@ build-muscat-motors:
 # Tool images are pulled via the Harbor Docker Hub proxy (runners have no direct
 # Docker Hub access):
 #   harbor.cp.bankdhofar.com/dockerhub/aquasec/trivy:<ver>
-#   harbor.cp.bankdhofar.com/dockerhub/bitnami/cosign:latest
+#   harbor.cp.bankdhofar.com/dockerhub/bitnami/cosign:2.4.1
 #
 # Cosign KEY-BASED model (see infra
 # overlays/oci-bankdhofar-muscat-dmz/kyverno/SUPPLY_CHAIN_AND_SOD.md): the bank
@@ -340,7 +340,7 @@ build-muscat-motors:
 .cosign_sign:
   stage: sign
   image:
-    name: harbor.cp.bankdhofar.com/dockerhub/bitnami/cosign:latest
+    name: harbor.cp.bankdhofar.com/dockerhub/bitnami/cosign:2.4.1
     entrypoint: [""]
   variables:
     COSIGN_YES: "true"   # non-interactive
