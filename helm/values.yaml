@@ -43,7 +43,7 @@ tppManager:
   image: ob-tpp-manager
   # Latest CI-built tag (pipeline 43859, commit 16512c9 — BFF user-update fix).
   # Pinned per-service because portal/tpp-manager build from different commits.
-  tag: "16512c92"
+  tag: "6f6733d4"
   port: 8000
   env:
     KEYCLOAK_URL: "http://keycloak.keycloak.svc.cluster.local:8080"
@@ -117,7 +117,7 @@ portal:
   replicas: 1
   image: ob-portal
   # Latest CI-built tag (pipeline 43855, commit d86ef74 — self-service portal UI).
-  tag: "d86ef742"
+  tag: "1aad273d"
   port: 80
   resources:
     requests:
