@@ -121,7 +121,7 @@ portal:
   replicas: 1
   image: ob-portal
   # Latest CI-built tag (pipeline 43855, commit d86ef74 — self-service portal UI).
-  tag: "895b6052"
+  tag: "1e9c52af"
   port: 80
   resources:
     requests:
