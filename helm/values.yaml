@@ -41,9 +41,9 @@ consentService:
 tppManager:
   replicas: 2
   image: ob-tpp-manager
-  # Latest CI-built tag (pipeline 43856, commit 1700e7b — self-service BFF).
+  # Latest CI-built tag (pipeline 43859, commit 16512c9 — BFF user-update fix).
   # Pinned per-service because portal/tpp-manager build from different commits.
-  tag: "1700e7b5"
+  tag: "16512c92"
   port: 8000
   env:
     KEYCLOAK_URL: "http://keycloak.keycloak.svc.cluster.local:8080"
@@ -52,8 +52,12 @@ tppManager:
     LOG_LEVEL: "info"
     BFF_CLIENT_ID: "qantara-portal-bff"
     PORTAL_BASE_URL: "https://qantara.omtd.bankdhofar.com"
-    # Stalwart relay (same server GitLab uses; bankdhofar.dev has SPF/DKIM/DMARC).
-    SMTP_HOST: "mx.bankdhofar.dev"
+    # Stalwart submission relay. Use the SAME host GitLab uses
+    # (mx.cp.bankdhofar.com → 10.150.99.54, the stalwart-stalwart-mail-0 LB that
+    # exposes 587/submission). The public mx.bankdhofar.dev LB (84.8.47.14) only
+    # serves port 25, so submitting on 587 there returns EOF. Envelope/From stays
+    # qantara@bankdhofar.dev (SPF/DKIM/DMARC live on that domain).
+    SMTP_HOST: "mx.cp.bankdhofar.com"
     SMTP_PORT: "587"
     SMTP_FROM: "qantara@bankdhofar.dev"
     SMTP_FROM_NAME: "Qantara Open Banking"
