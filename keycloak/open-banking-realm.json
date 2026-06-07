@@ -160,6 +160,14 @@
       "lastName": "Admin",
       "credentials": [{ "type": "password", "value": "QantaraAdmin@2026", "temporary": false }],
       "realmRoles": ["qantara-admin"]
+    },
+    {
+      "username": "service-account-qantara-admin-cli",
+      "enabled": true,
+      "serviceAccountClientId": "qantara-admin-cli",
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-users", "query-users"]
+      }
     }
   ]
 }

@@ -109,8 +109,19 @@ func (c *Client) SetUserAttributes(userID string, attrs map[string][]string) err
 		}
 		u.Attributes[k] = v
 	}
-	// Only send mutable fields.
-	payload := map[string]interface{}{"attributes": u.Attributes}
+	// Send identity fields alongside attributes. With realm
+	// registrationEmailAsUsername=true, Keycloak runs user-profile validation on
+	// PUT and rejects an attributes-only body with
+	// error-user-attribute-required(email). Echo the existing username/email so
+	// the update validates.
+	payload := map[string]interface{}{
+		"username":      u.Username,
+		"email":         u.Email,
+		"firstName":     u.FirstName,
+		"enabled":       u.Enabled,
+		"emailVerified": u.EmailVerified,
+		"attributes":    u.Attributes,
+	}
 	resp, err := c.doRequest(http.MethodPut, "/users/"+userID, payload)
 	if err != nil {
 		return err
