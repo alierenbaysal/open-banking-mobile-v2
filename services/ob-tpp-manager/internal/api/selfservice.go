@@ -19,14 +19,15 @@ const (
 	clAttrThumbprints  = "pinned_thumbprints"   // CSV of SHA-256 hex (matches Istio XFCC Hash=)
 	clAttrCertPEM      = "byo_cert_pem"          // most-recent bring-your-own anchor for the trust bundle
 	clAttrCertBound    = "tls.client.certificate.bound.access.tokens"
+	clAttrOwnerEmail   = "owner_email"           // session email of the partner who registered the TPP
 )
 
 // SetIPAllowlist stores the partner's allowed source CIDRs on their Keycloak client.
 // The DMZ reconciler turns these into an Istio AuthorizationPolicy.
 func (h *Handler) SetIPAllowlist(w http.ResponseWriter, r *http.Request) {
 	tppID := chi.URLParam(r, "tppId")
-	if !h.tppSelfOrAdmin(r, tppID) {
-		writeError(w, http.StatusForbidden, "forbidden", "Not authorized for this TPP")
+	if !h.ownsTPPOrAdmin(r, tppID) {
+		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
 	var req models.IPAllowlistRequest
@@ -55,8 +56,8 @@ func (h *Handler) SetIPAllowlist(w http.ResponseWriter, r *http.Request) {
 // GetIPAllowlist returns the partner's current allowlist.
 func (h *Handler) GetIPAllowlist(w http.ResponseWriter, r *http.Request) {
 	tppID := chi.URLParam(r, "tppId")
-	if !h.tppSelfOrAdmin(r, tppID) {
-		writeError(w, http.StatusForbidden, "forbidden", "Not authorized for this TPP")
+	if !h.ownsTPPOrAdmin(r, tppID) {
+		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
 	uuid, err := h.resolveClientUUID(tppID)
@@ -80,8 +81,8 @@ func (h *Handler) GetIPAllowlist(w http.ResponseWriter, r *http.Request) {
 // normal path.
 func (h *Handler) GenerateCert(w http.ResponseWriter, r *http.Request) {
 	tppID := chi.URLParam(r, "tppId")
-	if !h.tppSelfOrAdmin(r, tppID) {
-		writeError(w, http.StatusForbidden, "forbidden", "Not authorized for this TPP")
+	if !h.ownsTPPOrAdmin(r, tppID) {
+		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
 	var req models.CertGenerateRequest
@@ -170,6 +171,44 @@ func (h *Handler) GatewayConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- helpers ---
+
+// tppOwnerEmail resolves the owner_email for a TPP. It returns the in-memory
+// value if present, otherwise reads the owner_email Keycloak client attribute
+// (so ownership survives pod restarts / startup sync), caching it back into the
+// in-memory record. Returns "" if the TPP is unknown or has no owner.
+func (h *Handler) tppOwnerEmail(tppID string) string {
+	h.mu.RLock()
+	tpp, ok := h.tpps[tppID]
+	var cached string
+	if ok {
+		cached = tpp.OwnerEmail
+	}
+	h.mu.RUnlock()
+	if cached != "" {
+		return cached
+	}
+	if !ok {
+		return ""
+	}
+
+	uuid, err := h.resolveClientUUID(tppID)
+	if err != nil {
+		return ""
+	}
+	attrs, err := h.kc.GetClientAttributes(uuid)
+	if err != nil {
+		return ""
+	}
+	owner := strings.TrimSpace(attrs[clAttrOwnerEmail])
+	if owner != "" {
+		h.mu.Lock()
+		if t, ok := h.tpps[tppID]; ok {
+			t.OwnerEmail = owner
+		}
+		h.mu.Unlock()
+	}
+	return owner
+}
 
 func (h *Handler) resolveClientUUID(tppID string) (string, error) {
 	h.mu.RLock()

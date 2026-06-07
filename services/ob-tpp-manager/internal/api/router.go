@@ -48,6 +48,13 @@ func NewRouter(d Deps) http.Handler {
 	// Internal reconciler view consumed by the DMZ gateway-config CronJob.
 	r.Get("/portal-api/internal/gateway-config", h.requireReconciler(h.GatewayConfig))
 
+	// Admin console — partner + application management (admin session or X-Admin-Key).
+	r.Route("/portal-api/admin", func(r chi.Router) {
+		r.Get("/partners", h.requireAdmin(h.ListPartners))
+		r.Post("/partners/revoke", h.requireAdmin(h.RevokePartner))
+		r.Get("/applications", h.requireAdmin(h.ListApplications))
+	})
+
 	// TPP management + self-service (session-protected).
 	r.Route("/portal-api/tpp", func(r chi.Router) {
 		r.Post("/register", h.requireSession(h.Register))

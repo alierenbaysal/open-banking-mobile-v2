@@ -105,6 +105,23 @@ type SessionUser struct {
 	Roles   []string `json:"roles,omitempty"`
 }
 
+// --- Admin partner management ---
+
+// AdminPartner is one row in the admin partner-management console.
+type AdminPartner struct {
+	Email        string `json:"email"`
+	Name         string `json:"name,omitempty"`
+	Organisation string `json:"organisation,omitempty"`
+	Status       string `json:"status"` // onb_status: invited/pending/active/rejected/revoked
+	IsAdmin      bool   `json:"is_admin"`
+	CreatedAt    int64  `json:"created_at"` // Keycloak createdTimestamp (epoch millis)
+}
+
+// AdminRevokeRequest revokes a partner by email.
+type AdminRevokeRequest struct {
+	Email string `json:"email"`
+}
+
 // --- Self-service IP allowlist ---
 
 // IPAllowlistRequest sets the partner's allowed source CIDRs.

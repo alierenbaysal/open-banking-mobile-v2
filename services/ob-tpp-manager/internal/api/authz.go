@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"gitlab.bankdhofar.com/ea/open-banking/services/ob-tpp-manager/internal/session"
@@ -99,14 +100,21 @@ func (h *Handler) requireReconciler(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// tppSelfOrAdmin authorizes a self-service action on tppID: the session must be
-// admin, or the session user must be linked to that TPP.
-func (h *Handler) tppSelfOrAdmin(r *http.Request, tppID string) bool {
+// ownsTPPOrAdmin authorizes a self-service action on tppID by ownership: the
+// session must be admin, or the TPP's owner_email (resolved from its Keycloak
+// client attribute, falling back to the in-memory record) must equal the
+// session user's email (case-insensitive). TPPs with no owner (the pre-seeded
+// demo apps) are admin-only.
+func (h *Handler) ownsTPPOrAdmin(r *http.Request, tppID string) bool {
 	c := claimsFrom(r)
 	if c == nil {
 		return false
 	}
-	return hasRole(c.Roles, "qantara-admin") || c.TPP == tppID
+	if hasRole(c.Roles, "qantara-admin") {
+		return true
+	}
+	owner := h.tppOwnerEmail(tppID)
+	return owner != "" && strings.EqualFold(owner, c.Email)
 }
 
 func hasRole(roles []string, want string) bool {

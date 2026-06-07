@@ -36,6 +36,7 @@ const (
 	statusActive   = "active"
 	statusPending  = "pending"
 	statusRejected = "rejected"
+	statusRevoked  = "revoked"
 
 	activationTTL = 15 * time.Minute
 	pinTTL        = 24 * time.Hour

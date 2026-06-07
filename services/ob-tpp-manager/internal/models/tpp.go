@@ -29,6 +29,7 @@ type TPP struct {
 	Roles           []TPPRole         `json:"roles"`
 	Status          TPPStatus         `json:"status"`
 	ClientID        string            `json:"client_id"`
+	OwnerEmail      string            `json:"owner_email,omitempty"`
 	OrganisationID  string            `json:"organisation_id,omitempty"`
 	SoftwareID      string            `json:"software_id,omitempty"`
 	ContactEmail    string            `json:"contact_email,omitempty"`
@@ -47,6 +48,7 @@ type RegisterRequest struct {
 	OrganisationID string    `json:"organisation_id,omitempty"`
 	SoftwareID     string    `json:"software_id,omitempty"`
 	ContactEmail   string    `json:"contact_email,omitempty"`
+	OwnerEmail     string    `json:"owner_email,omitempty"` // admin-only override; defaults to session user
 }
 
 // UpdateRequest is the payload for updating a TPP registration.

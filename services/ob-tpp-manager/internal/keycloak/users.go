@@ -15,13 +15,14 @@ import (
 
 // User is a minimal Keycloak user representation.
 type User struct {
-	ID            string              `json:"id,omitempty"`
-	Username      string              `json:"username,omitempty"`
-	Email         string              `json:"email,omitempty"`
-	FirstName     string              `json:"firstName,omitempty"`
-	Enabled       bool                `json:"enabled"`
-	EmailVerified bool                `json:"emailVerified"`
-	Attributes    map[string][]string `json:"attributes,omitempty"`
+	ID               string              `json:"id,omitempty"`
+	Username         string              `json:"username,omitempty"`
+	Email            string              `json:"email,omitempty"`
+	FirstName        string              `json:"firstName,omitempty"`
+	Enabled          bool                `json:"enabled"`
+	EmailVerified    bool                `json:"emailVerified"`
+	CreatedTimestamp int64               `json:"createdTimestamp,omitempty"`
+	Attributes       map[string][]string `json:"attributes,omitempty"`
 }
 
 // FindUserByEmail returns the user with the given email (exact match), if any.
@@ -99,6 +100,25 @@ func (c *Client) ListUsersByAttribute(attrKey, attrVal string) ([]User, error) {
 		}
 	}
 	return out, nil
+}
+
+// ListUsers enumerates all realm users (with attributes). Used by the admin
+// partner-management console.
+func (c *Client) ListUsers() ([]User, error) {
+	resp, err := c.doRequest(http.MethodGet, "/users?max=1000&briefRepresentation=false", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("keycloak user enumerate returned %d: %s", resp.StatusCode, string(body))
+	}
+	var all []User
+	if err := json.NewDecoder(resp.Body).Decode(&all); err != nil {
+		return nil, fmt.Errorf("failed to decode user enumerate: %w", err)
+	}
+	return all, nil
 }
 
 func attrEquals(m map[string][]string, key, val string) bool {
@@ -192,6 +212,34 @@ func (c *Client) SetUserAttributes(userID string, attrs map[string][]string) err
 	if resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("keycloak update user returned %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+// DisableUser sets enabled=false on the user. Like SetUserAttributes it echoes
+// the identity fields (username/email/firstName) so the PUT passes user-profile
+// validation under registrationEmailAsUsername=true.
+func (c *Client) DisableUser(userID string) error {
+	u, err := c.getUser(userID)
+	if err != nil {
+		return err
+	}
+	payload := map[string]interface{}{
+		"username":      u.Username,
+		"email":         u.Email,
+		"firstName":     u.FirstName,
+		"enabled":       false,
+		"emailVerified": u.EmailVerified,
+		"attributes":    u.Attributes,
+	}
+	resp, err := c.doRequest(http.MethodPut, "/users/"+userID, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("keycloak disable user returned %d: %s", resp.StatusCode, string(body))
 	}
 	return nil
 }

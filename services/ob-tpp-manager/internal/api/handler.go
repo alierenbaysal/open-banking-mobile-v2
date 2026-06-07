@@ -162,6 +162,17 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	tppID := clientID
 	now := time.Now().UTC()
 
+	// Ownership: the registering session user owns the app. An admin may register
+	// on behalf of another partner by passing owner_email; otherwise the owner is
+	// the session user's own email.
+	ownerEmail := ""
+	if c := claimsFrom(r); c != nil {
+		ownerEmail = strings.ToLower(strings.TrimSpace(c.Email))
+		if req.OwnerEmail != "" && hasRole(c.Roles, "qantara-admin") {
+			ownerEmail = strings.ToLower(strings.TrimSpace(req.OwnerEmail))
+		}
+	}
+
 	h.mu.RLock()
 	if _, exists := h.tpps[tppID]; exists {
 		h.mu.RUnlock()
@@ -179,6 +190,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		Roles:          req.Roles,
 		Status:         models.StatusActive,
 		ClientID:       clientID,
+		OwnerEmail:     ownerEmail,
 		OrganisationID: req.OrganisationID,
 		SoftwareID:     req.SoftwareID,
 		ContactEmail:   req.ContactEmail,
@@ -233,7 +245,16 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	h.kcIDs[clientID] = kcID
 	h.mu.Unlock()
 
-	h.logger.Info("registered new TPP", "tpp_id", tppID, "client_id", clientID, "roles", req.Roles)
+	// Persist the owner on the Keycloak client so ownership survives pod restarts
+	// (the in-memory store is rebuilt from Keycloak via tppOwnerEmail). Best-effort:
+	// the registration already succeeded; an attribute write failure is logged.
+	if ownerEmail != "" {
+		if err := h.kc.SetClientAttributes(kcID, map[string]string{clAttrOwnerEmail: ownerEmail}); err != nil {
+			h.logger.Warn("failed to persist owner_email on keycloak client", "error", err, "tpp_id", tppID)
+		}
+	}
+
+	h.logger.Info("registered new TPP", "tpp_id", tppID, "client_id", clientID, "roles", req.Roles, "owner", ownerEmail)
 
 	// Return registration result with credentials.
 	type registerResponse struct {
@@ -254,7 +275,7 @@ func (h *Handler) GetTPP(w http.ResponseWriter, r *http.Request) {
 	tpp, ok := h.tpps[tppID]
 	h.mu.RUnlock()
 
-	if !ok {
+	if !ok || !h.ownsTPPOrAdmin(r, tppID) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
@@ -270,7 +291,7 @@ func (h *Handler) UpdateTPP(w http.ResponseWriter, r *http.Request) {
 	tpp, ok := h.tpps[tppID]
 	h.mu.RUnlock()
 
-	if !ok {
+	if !ok || !h.ownsTPPOrAdmin(r, tppID) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
@@ -332,7 +353,7 @@ func (h *Handler) SuspendTPP(w http.ResponseWriter, r *http.Request) {
 	tpp, ok := h.tpps[tppID]
 	h.mu.RUnlock()
 
-	if !ok {
+	if !ok || !h.ownsTPPOrAdmin(r, tppID) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
@@ -360,14 +381,41 @@ func (h *Handler) SuspendTPP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tpp)
 }
 
-// ListTPPs returns all registered TPPs sorted by creation time (newest first).
+// ListTPPs returns registered TPPs sorted by creation time (newest first).
+// Admins (qantara-admin) see every TPP. A partner sees ONLY the TPPs they own
+// (owner_email == their session email, case-insensitive). Pre-seeded demo apps
+// with no owner are admin-only and never returned to partners.
 func (h *Handler) ListTPPs(w http.ResponseWriter, r *http.Request) {
+	claims := claimsFrom(r)
+	isAdmin := claims != nil && hasRole(claims.Roles, "qantara-admin")
+	email := ""
+	if claims != nil {
+		email = strings.TrimSpace(claims.Email)
+	}
+
 	h.mu.RLock()
-	list := make([]*models.TPP, 0, len(h.tpps))
-	for _, tpp := range h.tpps {
-		list = append(list, tpp)
+	ids := make([]string, 0, len(h.tpps))
+	for id := range h.tpps {
+		ids = append(ids, id)
 	}
 	h.mu.RUnlock()
+
+	list := make([]*models.TPP, 0, len(ids))
+	for _, id := range ids {
+		h.mu.RLock()
+		tpp := h.tpps[id]
+		h.mu.RUnlock()
+		if tpp == nil {
+			continue
+		}
+		if !isAdmin {
+			owner := h.tppOwnerEmail(id)
+			if owner == "" || !strings.EqualFold(owner, email) {
+				continue
+			}
+		}
+		list = append(list, tpp)
+	}
 
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].CreatedAt.After(list[j].CreatedAt)
@@ -384,7 +432,7 @@ func (h *Handler) GenerateCredentials(w http.ResponseWriter, r *http.Request) {
 	tpp, ok := h.tpps[tppID]
 	h.mu.RUnlock()
 
-	if !ok {
+	if !ok || !h.ownsTPPOrAdmin(r, tppID) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
@@ -422,7 +470,7 @@ func (h *Handler) UploadCertificate(w http.ResponseWriter, r *http.Request) {
 	tpp, ok := h.tpps[tppID]
 	h.mu.RUnlock()
 
-	if !ok {
+	if !ok || !h.ownsTPPOrAdmin(r, tppID) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
@@ -472,7 +520,7 @@ func (h *Handler) GetCertificate(w http.ResponseWriter, r *http.Request) {
 	tpp, ok := h.tpps[tppID]
 	h.mu.RUnlock()
 
-	if !ok {
+	if !ok || !h.ownsTPPOrAdmin(r, tppID) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
@@ -493,7 +541,7 @@ func (h *Handler) GenerateSandboxToken(w http.ResponseWriter, r *http.Request) {
 	tpp, ok := h.tpps[tppID]
 	h.mu.RUnlock()
 
-	if !ok {
+	if !ok || !h.ownsTPPOrAdmin(r, tppID) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("TPP %s not found", tppID))
 		return
 	}
@@ -668,6 +716,12 @@ func (h *Handler) SyncFromConsentService() {
 		if !found {
 			h.logger.Warn("startup sync: keycloak client not found, skipping", "client_id", ct.ClientID)
 			continue
+		}
+
+		// Recover the registered owner from the Keycloak client attribute so
+		// ownership scoping works immediately after a restart.
+		if attrs, aerr := h.kc.GetClientAttributes(kcID); aerr == nil {
+			tpp.OwnerEmail = strings.TrimSpace(attrs[clAttrOwnerEmail])
 		}
 
 		h.mu.Lock()
