@@ -48,7 +48,7 @@ import { CodeBlock } from '../../components/common/CodeBlock';
 import { useAuth } from '../../hooks/useAuth';
 import { api, ApiError } from '../../utils/api';
 import { type TppApplication } from './index';
-import { getAppById as getAppByIdFromStore } from '../../utils/appStore';
+// App data comes from the owner-scoped backend (GET /portal-api/tpp/{id}), not a local store.
 
 interface CertificateInfo {
   subject: string;
@@ -84,56 +84,7 @@ function isValidCidrOrIp(value: string): boolean {
 }
 
 // Demo data — same as in index.tsx for cross-navigation
-const DEMO_APPS: TppApplication[] = [
-  {
-    id: 'masroofi-demo',
-    name: 'Masroofi \u2014 Personal Finance Manager',
-    description: 'Personal finance management app by Emrah Baysal. Track spending, view accounts, analyze transactions via Bank Dhofar Open Banking APIs.',
-    clientId: 'masroofi-demo',
-    clientSecret: 'masroofi-demo-secret-tnd',
-    status: 'active',
-    roles: ['AISP'],
-    redirectUris: ['https://masroofi.tnd.bankdhofar.com/callback'],
-    createdAt: '2026-04-12T00:00:00Z',
-    environment: 'production',
-  },
-  {
-    id: 'app-001',
-    name: 'FinTech PFM App',
-    description: 'Personal finance management application for account aggregation and budgeting.',
-    clientId: 'pfm-app-sandbox-001',
-    clientSecret: 'sb_sec_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6',
-    status: 'active',
-    roles: ['AISP'],
-    redirectUris: ['https://pfm.example.com/callback', 'https://pfm.example.com/auth/redirect'],
-    createdAt: '2026-04-01T10:00:00Z',
-    environment: 'sandbox',
-  },
-  {
-    id: 'app-002',
-    name: 'PayConnect Gateway',
-    description: 'Payment gateway for e-commerce merchants integrating with Bank Dhofar.',
-    clientId: 'payconnect-sandbox-002',
-    clientSecret: 'sb_sec_q1w2e3r4t5y6u7i8o9p0a1s2d3f4g5h6',
-    status: 'active',
-    roles: ['PISP', 'CBPII'],
-    redirectUris: ['https://pay.example.com/callback'],
-    createdAt: '2026-04-05T14:30:00Z',
-    environment: 'sandbox',
-  },
-  {
-    id: 'app-003',
-    name: 'Sweeping Service',
-    description: 'Automated savings sweep service using Variable Recurring Payments.',
-    clientId: 'sweep-sandbox-003',
-    clientSecret: 'sb_sec_z1x2c3v4b5n6m7k8j9h0g1f2d3s4a5q6',
-    status: 'pending',
-    roles: ['AISP', 'PISP'],
-    redirectUris: ['https://sweep.example.com/auth'],
-    createdAt: '2026-04-10T09:15:00Z',
-    environment: 'sandbox',
-  },
-];
+// DEMO_APPS removed — application is fetched from the owner-scoped backend.
 
 function CopyableField({ label, value, mono = true }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -162,13 +113,41 @@ export default function AppDetail() {
   const [secretVisible, setSecretVisible] = useState(false);
   const [regenerateConfirm, { open: openRegenerate, close: closeRegenerate }] = useDisclosure(false);
 
-  // Try shared store first (includes built-in + user-registered), fallback to DEMO_APPS
-  let app: TppApplication | undefined = getAppByIdFromStore(appId || '');
-  if (!app) {
-    app = DEMO_APPS.find((a) => a.id === appId);
-  }
+  const [app, setApp] = useState<TppApplication | undefined>(undefined);
+  const [loadingApp, setLoadingApp] = useState(true);
 
-  if (authLoading) {
+  // Fetch the application from the owner-scoped backend. A partner can only load
+  // an app they own (others return 404); admins can load any. No local/demo data.
+  useEffect(() => {
+    if (!appId) { setLoadingApp(false); return; }
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/portal-api/tpp/${encodeURIComponent(appId)}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('not found');
+        const t = await res.json();
+        if (active) setApp({
+          id: t.id || t.client_id,
+          name: t.name,
+          description: t.description || '',
+          clientId: t.client_id,
+          clientSecret: '',
+          status: t.status === 'active' ? 'active' : t.status === 'pending' ? 'pending' : 'inactive',
+          roles: t.roles || [],
+          redirectUris: t.redirect_uris || [],
+          createdAt: t.created_at || new Date().toISOString(),
+          environment: 'sandbox',
+        });
+      } catch {
+        if (active) setApp(undefined);
+      } finally {
+        if (active) setLoadingApp(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [appId]);
+
+  if (authLoading || loadingApp) {
     return (
       <Container size="lg">
         <Center py={80}>

@@ -24,7 +24,7 @@ import {
   Loader,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   IconPlus,
@@ -37,73 +37,55 @@ import {
   IconTrash,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth';
-import { getAllApps as getAllAppsFromStore, registerApp as registerAppToStore, deleteApp as deleteAppFromStore } from '../../utils/appStore';
 import { StatusBadge } from '../../components/common/StatusBadge';
 
+// Display shape for an application card.
 export interface TppApplication {
   id: string;
   name: string;
   description: string;
   clientId: string;
+  // The stored client secret is never returned by the backend list/get (it is
+  // shown once at registration / on regenerate); kept on the type for the detail
+  // view but blank here.
   clientSecret: string;
   status: 'active' | 'pending' | 'inactive';
   roles: string[];
   redirectUris: string[];
   createdAt: string;
-  environment: 'sandbox' | 'production';
+  environment: string;
 }
 
-// In-memory store for demo purposes
-const INITIAL_APPS: TppApplication[] = [
-  {
-    id: 'masroofi-demo',
-    name: 'Masroofi \u2014 Personal Finance Manager',
-    description: 'Bank Dhofar\'s personal finance management app. Aggregates accounts, tracks spending, and provides budgeting insights using Open Banking APIs.',
-    clientId: 'masroofi-demo',
-    clientSecret: 'sb_sec_masroofi_demo_internal',
-    status: 'active',
-    roles: ['AISP'],
-    redirectUris: ['https://masroofi.tnd.bankdhofar.com/callback'],
-    createdAt: '2026-04-12T00:00:00Z',
-    environment: 'production',
-  },
-  {
-    id: 'app-001',
-    name: 'FinTech PFM App',
-    description: 'Personal finance management application for account aggregation and budgeting.',
-    clientId: 'pfm-app-sandbox-001',
-    clientSecret: 'sb_sec_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6',
-    status: 'active',
-    roles: ['AISP'],
-    redirectUris: ['https://pfm.example.com/callback', 'https://pfm.example.com/auth/redirect'],
-    createdAt: '2026-04-01T10:00:00Z',
+// Raw TPP as returned by the scoped backend (GET /portal-api/tpp). The list is
+// already filtered server-side: a partner sees ONLY apps they own; an admin sees
+// all. There are NO hardcoded/built-in apps — this is the single source of truth.
+interface BackendTPP {
+  id: string;
+  name: string;
+  description?: string;
+  client_id: string;
+  status?: string;
+  roles?: string[];
+  redirect_uris?: string[];
+  created_at?: string;
+}
+
+function mapTPP(t: BackendTPP): TppApplication {
+  const status: TppApplication['status'] =
+    t.status === 'active' ? 'active' : t.status === 'pending' ? 'pending' : 'inactive';
+  return {
+    id: t.id || t.client_id,
+    name: t.name,
+    description: t.description || '',
+    clientId: t.client_id,
+    clientSecret: '',
+    status,
+    roles: t.roles || [],
+    redirectUris: t.redirect_uris || [],
+    createdAt: t.created_at || new Date().toISOString(),
     environment: 'sandbox',
-  },
-  {
-    id: 'app-002',
-    name: 'PayConnect Gateway',
-    description: 'Payment gateway for e-commerce merchants integrating with Bank Dhofar.',
-    clientId: 'payconnect-sandbox-002',
-    clientSecret: 'sb_sec_q1w2e3r4t5y6u7i8o9p0a1s2d3f4g5h6',
-    status: 'active',
-    roles: ['PISP', 'CBPII'],
-    redirectUris: ['https://pay.example.com/callback'],
-    createdAt: '2026-04-05T14:30:00Z',
-    environment: 'sandbox',
-  },
-  {
-    id: 'app-003',
-    name: 'Sweeping Service',
-    description: 'Automated savings sweep service using Variable Recurring Payments.',
-    clientId: 'sweep-sandbox-003',
-    clientSecret: 'sb_sec_z1x2c3v4b5n6m7k8j9h0g1f2d3s4a5q6',
-    status: 'pending',
-    roles: ['AISP', 'PISP'],
-    redirectUris: ['https://sweep.example.com/auth'],
-    createdAt: '2026-04-10T09:15:00Z',
-    environment: 'sandbox',
-  },
-];
+  };
+}
 
 const ROLE_OPTIONS = [
   { value: 'AISP', label: 'AISP - Account Information Service Provider', description: 'Access account data' },
@@ -111,27 +93,28 @@ const ROLE_OPTIONS = [
   { value: 'CBPII', label: 'CBPII - Card Based Payment Instrument Issuer', description: 'Confirm funds' },
 ];
 
-function generateClientId(appName: string, environment: string): string {
-  const slug = appName
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  const suffix = environment === 'sandbox' ? '-sandbox' : '-prod';
-  return slug + suffix;
-}
-
-function generateClientSecret(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `sb_sec_${hex}`;
+async function apiJSON<T>(url: string, opts: RequestInit = {}): Promise<T> {
+  const res = await fetch(url, { credentials: 'include', ...opts });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const b = await res.json();
+      msg = b.message || b.error || msg;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<T>;
 }
 
 export default function ApplicationsPage() {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [apps, setApps] = useState<TppApplication[]>(() => getAllAppsFromStore());
+  const [apps, setApps] = useState<TppApplication[]>([]);
+  const [loadingApps, setLoadingApps] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [credentialsOpened, { open: openCredentials, close: closeCredentials }] = useDisclosure(false);
 
@@ -143,8 +126,9 @@ export default function ApplicationsPage() {
   const [newEnvironment, setNewEnvironment] = useState<string>('sandbox');
   const [newRedirectUris, setNewRedirectUris] = useState('');
   const [newRoles, setNewRoles] = useState<string[]>([]);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Credentials display state (shown after successful registration)
+  // Credentials display state (shown once after successful registration).
   const [createdCredentials, setCreatedCredentials] = useState<{
     clientId: string;
     clientSecret: string;
@@ -152,9 +136,28 @@ export default function ApplicationsPage() {
     appId: string;
   } | null>(null);
 
-  // Pre-fill contact email when opening the create modal
+  // Load the caller's OWN applications from the scoped backend.
+  const loadApps = useCallback(async () => {
+    setLoadingApps(true);
+    setLoadError(null);
+    try {
+      const data = await apiJSON<BackendTPP[]>('/portal-api/tpp');
+      setApps((data || []).map(mapTPP));
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : 'Failed to load applications');
+      setApps([]);
+    } finally {
+      setLoadingApps(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) loadApps();
+  }, [isAuthenticated, loadApps]);
+
   const handleOpenCreate = useCallback(() => {
     setNewContactEmail(user?.email || '');
+    setFormError(null);
     openCreate();
   }, [user, openCreate]);
 
@@ -166,66 +169,64 @@ export default function ApplicationsPage() {
     setNewEnvironment('sandbox');
     setNewRedirectUris('');
     setNewRoles([]);
+    setFormError(null);
   }, []);
 
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (!newName || newRoles.length === 0) return;
-
-    const clientId = generateClientId(newName, newEnvironment);
-    const clientSecret = generateClientSecret();
-
-    const app: TppApplication = {
-      id: clientId,
-      name: newName,
-      description: newDescription,
-      clientId,
-      clientSecret,
-      status: newEnvironment === 'sandbox' ? 'active' : 'pending',
-      roles: newRoles,
-      redirectUris: newRedirectUris.split('\n').map((u) => u.trim()).filter(Boolean),
-      createdAt: new Date().toISOString(),
-      environment: newEnvironment as 'sandbox' | 'production',
-    };
-
-    // 1. Add to local state + persist in localStorage
-    setApps((prev) => [app, ...prev]);
-    registerAppToStore(app);
-
-    // 2. Fire-and-forget TPP manager API call (don't block on it)
+    setSubmitting(true);
+    setFormError(null);
     try {
-      fetch('/portal-api/tpp/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newName,
-          description: newDescription,
-          companyName: newCompanyName,
-          contactEmail: newContactEmail,
-          environment: newEnvironment,
-          roles: newRoles,
-          redirectUris: app.redirectUris,
-        }),
-      }).catch(() => {
-        // Silently ignore — the app is already in local state
+      // Register against the backend, which owns the client_id/secret and binds
+      // the app to the signed-in owner. Cookie session is sent (credentials).
+      const resp = await apiJSON<{ client_id: string; client_secret: string; name: string }>(
+        '/portal-api/tpp/register',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newName,
+            description: newDescription,
+            roles: newRoles,
+            redirect_uris: newRedirectUris.split('\n').map((u) => u.trim()).filter(Boolean),
+            contact_email: newContactEmail,
+            organisation_id: newCompanyName,
+          }),
+        },
+      );
+      closeCreate();
+      resetForm();
+      setCreatedCredentials({
+        clientId: resp.client_id,
+        clientSecret: resp.client_secret,
+        appName: resp.name || newName,
+        appId: resp.client_id,
       });
-    } catch {
-      // Ignore fetch errors
+      openCredentials();
+      await loadApps();
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Registration failed');
+    } finally {
+      setSubmitting(false);
     }
+  }, [newName, newDescription, newCompanyName, newContactEmail, newRedirectUris, newRoles, closeCreate, resetForm, openCredentials, loadApps]);
 
-    // 3. Close registration modal and show credentials
-    closeCreate();
-    resetForm();
-    setCreatedCredentials({ clientId, clientSecret, appName: newName, appId: clientId });
-    openCredentials();
-  }, [newName, newDescription, newCompanyName, newContactEmail, newEnvironment, newRedirectUris, newRoles, closeCreate, resetForm, openCredentials]);
+  const handleDelete = useCallback(async (app: TppApplication, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${app.name}"? This cannot be undone.`)) return;
+    try {
+      await apiJSON(`/portal-api/tpp/${encodeURIComponent(app.id)}`, { method: 'DELETE' });
+    } catch {
+      /* surfaced via reload */
+    }
+    await loadApps();
+  }, [loadApps]);
 
   const handleCredentialsDismiss = useCallback(() => {
     const appId = createdCredentials?.appId;
     closeCredentials();
     setCreatedCredentials(null);
-    if (appId) {
-      navigate(`/applications/${appId}`);
-    }
+    if (appId) navigate(`/applications/${appId}`);
   }, [createdCredentials, closeCredentials, navigate]);
 
   if (authLoading) {
@@ -280,7 +281,15 @@ export default function ApplicationsPage() {
           </Button>
         </Group>
 
-        {apps.length === 0 ? (
+        {loadError && (
+          <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
+            {loadError}
+          </Alert>
+        )}
+
+        {loadingApps ? (
+          <Center py={60}><Loader color="bankGreen" /></Center>
+        ) : apps.length === 0 ? (
           <Card withBorder p="xl" ta="center">
             <Stack align="center" gap="md">
               <ThemeIcon size={64} radius="xl" color="gray" variant="light">
@@ -311,13 +320,7 @@ export default function ApplicationsPage() {
                         variant="subtle"
                         color="red"
                         size="sm"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          if (window.confirm(`Delete "${app.name}"? This cannot be undone.`)) {
-                            deleteAppFromStore(app.id);
-                            setApps(getAllAppsFromStore());
-                          }
-                        }}
+                        onClick={(e: React.MouseEvent) => handleDelete(app, e)}
                       >
                         <IconTrash size={14} />
                       </ActionIcon>
@@ -335,9 +338,6 @@ export default function ApplicationsPage() {
                   ))}
                 </Group>
                 <Group gap="xs">
-                  <Badge variant="light" color="blue" size="sm">
-                    {app.environment}
-                  </Badge>
                   <Group gap={4}>
                     <IconCalendar size={12} color="gray" />
                     <Text size="xs" c="dimmed">
@@ -358,6 +358,12 @@ export default function ApplicationsPage() {
             Sandbox applications are created immediately. Production access requires review and
             approval from Bank Dhofar.
           </Alert>
+
+          {formError && (
+            <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
+              {formError}
+            </Alert>
+          )}
 
           <TextInput
             label="Application Name"
@@ -438,6 +444,7 @@ export default function ApplicationsPage() {
             <Button variant="subtle" onClick={closeCreate}>Cancel</Button>
             <Button
               onClick={handleCreate}
+              loading={submitting}
               disabled={!newName || newRoles.length === 0}
             >
               Register Application
