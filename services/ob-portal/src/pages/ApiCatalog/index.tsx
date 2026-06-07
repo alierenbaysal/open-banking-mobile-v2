@@ -24,6 +24,8 @@ import {
   IconSparkles,
   IconCar,
   IconWallet,
+  IconBuildingSkyscraper,
+  IconContract,
 } from '@tabler/icons-react';
 
 export type ApiKind = 'obie' | 'open-finance';
@@ -140,6 +142,44 @@ export const API_GROUPS: ApiGroup[] = [
     server: 'https://qantara-api.omtd.bankdhofar.com/easybiz',
     auth: 'OAuth2 client_credentials + mTLS (passthrough)',
   },
+  // ─────────────────────────────────────────────────────────────
+  // Corporate Banking (DEH) — external passthrough to channels-at.uatd
+  // Non-OBIE custom section on the unified API host.
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: 'corporate',
+    name: 'Corporate Banking',
+    description: 'Corporate account information, beneficiary management and fund transfers, fronting the Bank Dhofar Digital Engagement Hub (DEH) backend (channels-at.uatd.bankdhofar.com). External passthrough — Bank Dhofar relays the authenticated request to DEH and returns its response verbatim. Covers operative/deposit/loan account listing, balance inquiry, beneficiary listing, fund transfer, mini-statement and transaction history. Non-OBIE custom section published on the unified API host.',
+    icon: IconBuildingSkyscraper,
+    color: 'indigo',
+    version: 'v1.0',
+    endpointCount: 9,
+    basePath: '/corporate',
+    kind: 'open-finance',
+    commercialModel: 'Corporate API agreement (Open API access entitlement)',
+    customBadge: 'Custom · Corporate',
+    server: 'https://qantara-api.omtd.bankdhofar.com/corporate',
+    auth: 'OAuth2 client_credentials + mTLS (passthrough)',
+  },
+  // ─────────────────────────────────────────────────────────────
+  // E-Mandate Services — external passthrough to emandate.uat
+  // Non-OBIE custom section on the unified API host.
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: 'emandate',
+    name: 'E-Mandate Services',
+    description: 'Direct-debit mandate lifecycle and bulk payment APIs for Financial Institutes, fronting the Bank Dhofar E-Mandate backend (emandate.uat.bankdhofar.com) integrated with the CBO (Central Bank of Oman) system powered by ProgressSoft. External passthrough — Bank Dhofar relays the authenticated request to the E-Mandate platform. Covers company registration, mandate initiate/amend/terminate, acknowledgement/acceptance, and bulk payment release/response. Non-OBIE custom section published on the unified API host.',
+    icon: IconContract,
+    color: 'grape',
+    version: 'v1.0',
+    endpointCount: 9,
+    basePath: '/emandate',
+    kind: 'open-finance',
+    commercialModel: 'Financial Institute agreement (CBO E-Mandate)',
+    customBadge: 'Custom · E-Mandate',
+    server: 'https://qantara-api.omtd.bankdhofar.com/emandate',
+    auth: 'OAuth2 client_credentials + mTLS (passthrough)',
+  },
 ];
 
 export default function ApiCatalog() {
@@ -225,7 +265,7 @@ export default function ApiCatalog() {
                 </Text>
               </div>
               <Badge size="lg" variant="filled" color="yellow" leftSection={<IconSparkles size={12} />}>
-                NEW · Auto Lending + EasyBiz
+                NEW · Auto Lending + EasyBiz + Corporate + E-Mandate
               </Badge>
             </Group>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
