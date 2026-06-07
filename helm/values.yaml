@@ -52,6 +52,10 @@ tppManager:
     LOG_LEVEL: "info"
     BFF_CLIENT_ID: "qantara-portal-bff"
     PORTAL_BASE_URL: "https://qantara.omtd.bankdhofar.com"
+    # Entra SSO: admins are bank staff (ADMIN_DOMAIN) or explicitly listed emails.
+    # Everyone else who signs in via Entra is a partner (tpp-developer).
+    ADMIN_DOMAIN: "bankdhofar.com"
+    ADMIN_EMAILS: "e.baysal@bankdhofar.com"
     # Stalwart submission relay. Use the SAME host GitLab uses
     # (mx.cp.bankdhofar.com → 10.150.99.54, the stalwart-stalwart-mail-0 LB that
     # exposes 587/submission). The public mx.bankdhofar.dev LB (84.8.47.14) only

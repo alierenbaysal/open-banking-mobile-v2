@@ -89,6 +89,27 @@ func (h *Handler) sendInvite(userID, email, name, tppClient string, admin bool) 
 		h.logger.Warn("could not assign tpp-developer role", "email", email, "error", err)
 	}
 
+	// SSO path: external partners sign in with an Entra B2B guest identity, so
+	// approval means "send the guest invite and mark the account active". No magic
+	// PIN is needed — the human authenticates via Entra. Bank-domain emails are
+	// already in the directory and don't need a guest invite. The guest invite is
+	// best-effort: a missing Graph permission must not block approval.
+	if !admin && !h.isAdminEmail(email) {
+		if err := h.inviteGuest(email); err != nil {
+			h.logger.Warn("entra B2B guest invite failed — approving anyway", "email", email, "error", err)
+		} else {
+			h.logger.Info("entra B2B guest invited", "email", email)
+		}
+		attrs := map[string][]string{attrStatus: {statusActive}}
+		if tppClient != "" {
+			attrs[attrTPP] = []string{tppClient}
+		}
+		if err := h.kc.SetUserAttributes(userID, attrs); err != nil {
+			return models.InviteResponse{}, fmt.Errorf("Failed to mark approved: %w", err)
+		}
+		return models.InviteResponse{Email: email, Status: statusActive, Emailed: true}, nil
+	}
+
 	pin := genPIN()
 	salt := genSalt()
 	exp := time.Now().Add(pinTTL)

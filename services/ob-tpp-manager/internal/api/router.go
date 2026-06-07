@@ -38,6 +38,11 @@ func NewRouter(d Deps) http.Handler {
 		r.Post("/login", h.Login)
 		r.Post("/logout", h.Logout)
 		r.Get("/me", h.requireSession(h.Me))
+
+		// Microsoft Entra (Azure AD) SSO — the live human login path. The
+		// password/PIN/TOTP endpoints above are left in place but dormant.
+		r.Get("/sso/login", h.SSOLogin)       // public — start OIDC + PKCE
+		r.Get("/sso/callback", h.SSOCallback) // public — Entra redirect target
 	})
 
 	// Internal reconciler view consumed by the DMZ gateway-config CronJob.

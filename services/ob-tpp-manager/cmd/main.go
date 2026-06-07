@@ -105,6 +105,13 @@ func main() {
 		PortalBaseURL:     cfg.PortalBaseURL,
 		AdminAPIKey:       cfg.AdminAPIKey,
 		ReconcilerAPIKey:  cfg.ReconcilerAPIKey,
+		EntraClientID:     cfg.EntraClientID,
+		EntraClientSecret: cfg.EntraClientSecret,
+		EntraTenantID:     cfg.EntraTenantID,
+		GraphClientID:     cfg.GraphClientID,
+		GraphClientSecret: cfg.GraphClientSecret,
+		AdminDomain:       cfg.AdminDomain,
+		AdminEmails:       cfg.AdminEmails,
 		Logger:            logger,
 	})
 

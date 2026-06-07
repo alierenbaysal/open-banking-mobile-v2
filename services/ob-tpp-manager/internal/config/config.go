@@ -23,6 +23,19 @@ type Config struct {
 	AdminAPIKey      string
 	ReconcilerAPIKey string
 
+	// Microsoft Entra (Azure AD) SSO — human login via OIDC. The BFF is a
+	// confidential OIDC client; Keycloak stays the user/data store.
+	EntraClientID     string
+	EntraClientSecret string
+	EntraTenantID     string
+	// Graph app (svc-entra-automation) used for B2B guest invites on approval.
+	GraphClientID     string
+	GraphClientSecret string
+	// Admins are recognised by exact email (ADMIN_EMAILS, comma list) or by
+	// belonging to ADMIN_DOMAIN. Everyone else is a partner.
+	AdminDomain string
+	AdminEmails string
+
 	// SMTP (Stalwart relay) for invites + magic PINs.
 	SMTPHost        string
 	SMTPPort        string
@@ -50,6 +63,14 @@ func Load() (*Config, error) {
 		SessionSecret:    os.Getenv("SESSION_SECRET"),
 		AdminAPIKey:      os.Getenv("ADMIN_API_KEY"),
 		ReconcilerAPIKey: os.Getenv("RECONCILER_API_KEY"),
+
+		EntraClientID:     os.Getenv("ENTRA_CLIENT_ID"),
+		EntraClientSecret: os.Getenv("ENTRA_CLIENT_SECRET"),
+		EntraTenantID:     os.Getenv("ENTRA_TENANT_ID"),
+		GraphClientID:     os.Getenv("GRAPH_CLIENT_ID"),
+		GraphClientSecret: os.Getenv("GRAPH_CLIENT_SECRET"),
+		AdminDomain:       envOrDefault("ADMIN_DOMAIN", "bankdhofar.com"),
+		AdminEmails:       envOrDefault("ADMIN_EMAILS", "e.baysal@bankdhofar.com"),
 
 		SMTPHost:        os.Getenv("SMTP_HOST"),
 		SMTPPort:        envOrDefault("SMTP_PORT", "587"),

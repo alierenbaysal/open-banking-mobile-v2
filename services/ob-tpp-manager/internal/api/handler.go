@@ -34,7 +34,17 @@ type Deps struct {
 	PortalBaseURL     string
 	AdminAPIKey       string
 	ReconcilerAPIKey  string
-	Logger            *slog.Logger
+
+	// Entra SSO + Graph B2B invite.
+	EntraClientID     string
+	EntraClientSecret string
+	EntraTenantID     string
+	GraphClientID     string
+	GraphClientSecret string
+	AdminDomain       string
+	AdminEmails       string
+
+	Logger *slog.Logger
 }
 
 // Handler holds all HTTP handler dependencies.
@@ -49,7 +59,19 @@ type Handler struct {
 	portalBaseURL     string
 	adminAPIKey       string
 	reconcilerAPIKey  string
-	logger            *slog.Logger
+
+	// Entra SSO + Graph B2B invite.
+	entraClientID     string
+	entraClientSecret string
+	entraTenantID     string
+	graphClientID     string
+	graphClientSecret string
+	adminDomain       string
+	adminEmails       []string
+
+	httpClient *http.Client
+
+	logger *slog.Logger
 
 	// In-memory TPP store. The consent-service TPP registry is the persistent
 	// store; per-TPP edge state (thumbprints, IP allowlist) lives as Keycloak
@@ -73,10 +95,29 @@ func NewHandler(d Deps) *Handler {
 		portalBaseURL:     d.PortalBaseURL,
 		adminAPIKey:       d.AdminAPIKey,
 		reconcilerAPIKey:  d.ReconcilerAPIKey,
+		entraClientID:     d.EntraClientID,
+		entraClientSecret: d.EntraClientSecret,
+		entraTenantID:     d.EntraTenantID,
+		graphClientID:     d.GraphClientID,
+		graphClientSecret: d.GraphClientSecret,
+		adminDomain:       strings.ToLower(strings.TrimSpace(d.AdminDomain)),
+		adminEmails:       splitCSVLower(d.AdminEmails),
+		httpClient:        &http.Client{Timeout: 30 * time.Second},
 		logger:            d.Logger,
 		tpps:              make(map[string]*models.TPP),
 		kcIDs:             make(map[string]string),
 	}
+}
+
+// splitCSVLower parses a comma-separated list into trimmed, lowercased entries.
+func splitCSVLower(csv string) []string {
+	var out []string
+	for _, p := range strings.Split(csv, ",") {
+		if v := strings.ToLower(strings.TrimSpace(p)); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // Health responds with service health status.

@@ -21,6 +21,7 @@ type Purpose string
 const (
 	PurposeSession    Purpose = "session"
 	PurposeActivation Purpose = "activation"
+	PurposeSSOState   Purpose = "ssostate"
 )
 
 // Claims is the payload carried by a signed token.
@@ -33,6 +34,13 @@ type Claims struct {
 	Roles    []string `json:"roles,omitempty"`
 	IssuedAt int64    `json:"iat"`
 	Expiry   int64    `json:"exp"`
+
+	// SSO state fields (Purpose=ssostate only) — the signed, short-lived state
+	// that the Entra OIDC login round-trip carries through the state cookie.
+	Nonce        string `json:"nonce,omitempty"`
+	PKCEVerifier string `json:"pkce,omitempty"`
+	ReturnPath   string `json:"rp,omitempty"`
+	RedirectURI  string `json:"ru,omitempty"`
 }
 
 // Signer signs and verifies tokens with a shared secret.

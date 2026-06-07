@@ -55,6 +55,12 @@ spec:
               value: {{ .Values.tppManager.env.BFF_CLIENT_ID | quote }}
             - name: PORTAL_BASE_URL
               value: {{ .Values.tppManager.env.PORTAL_BASE_URL | quote }}
+            # Microsoft Entra (Azure AD) SSO — human login via OIDC. Admins are
+            # recognised by ADMIN_EMAILS / ADMIN_DOMAIN; everyone else is a partner.
+            - name: ADMIN_DOMAIN
+              value: {{ .Values.tppManager.env.ADMIN_DOMAIN | quote }}
+            - name: ADMIN_EMAILS
+              value: {{ .Values.tppManager.env.ADMIN_EMAILS | quote }}
             - name: SMTP_HOST
               value: {{ .Values.tppManager.env.SMTP_HOST | quote }}
             - name: SMTP_PORT
@@ -98,6 +104,39 @@ spec:
                 secretKeyRef:
                   name: qantara-portal-secrets
                   key: reconciler_api_key
+                  optional: true
+            # Entra SSO (OIDC confidential client) + Graph app (svc-entra-automation,
+            # B2B guest invites). optional:true so the pod still starts before the
+            # Vault entry is seeded.
+            - name: ENTRA_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: entra_client_id
+                  optional: true
+            - name: ENTRA_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: entra_client_secret
+                  optional: true
+            - name: ENTRA_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: entra_tenant_id
+                  optional: true
+            - name: GRAPH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: graph_client_id
+                  optional: true
+            - name: GRAPH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: qantara-portal-secrets
+                  key: graph_client_secret
                   optional: true
           resources:
             {{- toYaml .Values.tppManager.resources | nindent 12 }}
