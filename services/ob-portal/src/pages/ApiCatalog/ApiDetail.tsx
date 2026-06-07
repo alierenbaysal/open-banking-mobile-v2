@@ -126,6 +126,13 @@ const API_ENDPOINTS: Record<string, Endpoint[]> = {
     { method: 'GET', path: '/healthz', summary: 'Liveness probe', description: 'Service health check. No auth required.', responseBody: JSON.stringify({ status: "ok", version: "1.0.0" }, null, 2) },
     { method: 'GET', path: '/readyz', summary: 'Readiness probe', description: 'Verifies backend dependencies (Postgres, Redis) are reachable.', responseBody: JSON.stringify({ status: "ready", checks: { database: { ok: true, error: null }, redis: { ok: true, error: null } } }, null, 2) },
   ],
+  // ─────────────────────────────────────────────────────────────
+  // EasyBiz — Partner Service (Hylobiz virtual-account passthrough)
+  // External passthrough to easybiz.dob.bankdhofar.com
+  // ─────────────────────────────────────────────────────────────
+  easybiz: [
+    { method: 'POST', path: '/generate-virtual-account', summary: 'Generate virtual account (Hylobiz)', description: 'Generate a virtual account for a partner customer. This is an external passthrough: Bank Dhofar authenticates the caller (OAuth2 client_credentials + mTLS), then relays the request to the EasyBiz / Hylobiz backend (easybiz.dob.bankdhofar.com) and returns its response verbatim. No consent is required.', requestBody: JSON.stringify({ partner_id: "HYLO-PARTNER-001", customer_name: "Al Madina Trading LLC", customer_reference: "CUST-REF-88231", currency: "OMR", purpose: "collections" }, null, 2), responseBody: JSON.stringify({ virtual_account_number: "OM93BDOF0001234567890123", iban: "OM93BDOF0001234567890123", partner_id: "HYLO-PARTNER-001", customer_reference: "CUST-REF-88231", currency: "OMR", status: "active", created_at: "2026-06-07T09:30:00Z", source: "easybiz.dob.bankdhofar.com" }, null, 2) },
+  ],
 };
 
 function EndpointCard({ endpoint, basePath, apiId }: { endpoint: Endpoint; basePath: string; apiId: string }) {
@@ -225,7 +232,14 @@ export default function ApiDetail() {
                 <group.icon size={22} />
               </ThemeIcon>
               <div>
-                <Title order={2}>{group.name}</Title>
+                <Group gap="xs" align="center">
+                  <Title order={2}>{group.name}</Title>
+                  {group.customBadge && (
+                    <Badge variant="dot" color="yellow" size="md">
+                      {group.customBadge}
+                    </Badge>
+                  )}
+                </Group>
               </div>
             </Group>
             <Text c="dimmed" mt="xs" maw={700}>{group.description}</Text>
@@ -237,10 +251,24 @@ export default function ApiDetail() {
         </Group>
 
         <Card withBorder p="md" bg="gray.0">
-          <Group gap="xs">
-            <Text size="sm" fw={600}>Base Path:</Text>
-            <Text size="sm" ff="monospace">{group.basePath}</Text>
-          </Group>
+          <Stack gap="xs">
+            {group.server && (
+              <Group gap="xs">
+                <Text size="sm" fw={600}>Server:</Text>
+                <Text size="sm" ff="monospace">{group.server}</Text>
+              </Group>
+            )}
+            <Group gap="xs">
+              <Text size="sm" fw={600}>Base Path:</Text>
+              <Text size="sm" ff="monospace">{group.basePath}</Text>
+            </Group>
+            {group.auth && (
+              <Group gap="xs">
+                <Text size="sm" fw={600}>Auth:</Text>
+                <Text size="sm">{group.auth}</Text>
+              </Group>
+            )}
+          </Stack>
         </Card>
 
         <Stack gap="sm">

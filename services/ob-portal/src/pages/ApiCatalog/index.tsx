@@ -23,6 +23,7 @@ import {
   IconSearch,
   IconSparkles,
   IconCar,
+  IconWallet,
 } from '@tabler/icons-react';
 
 export type ApiKind = 'obie' | 'open-finance';
@@ -38,6 +39,12 @@ export interface ApiGroup {
   basePath: string;
   kind: ApiKind;
   commercialModel?: string;
+  /** Custom (non-OBIE) marker badge, e.g. "Custom · Auto Lending". Present only on proprietary sections. */
+  customBadge?: string;
+  /** Fully-qualified server/base URL on the unified API host. Shown on the detail page when present. */
+  server?: string;
+  /** Human-readable auth summary, e.g. "OAuth2 client_credentials + mTLS (no consent)". */
+  auth?: string;
 }
 
 export const API_GROUPS: ApiGroup[] = [
@@ -102,7 +109,7 @@ export const API_GROUPS: ApiGroup[] = [
   {
     id: 'auto-lending',
     name: 'Auto Loan Origination',
-    description: 'Embedded auto-lending APIs for registered auto-lending TPPs (car dealers, DMS vendors). Create loan applications, receive real-time decisions, sign contracts and receive disbursement webhooks — all at the showroom.',
+    description: 'Embedded auto-lending APIs (Muscat Motors) for registered auto-lending TPPs (car dealers, DMS vendors). Create loan applications, receive real-time decisions, sign contracts and receive disbursement webhooks — all at the showroom. Non-OBIE custom section published on the unified API host.',
     icon: IconCar,
     color: 'yellow',
     version: 'v1.0',
@@ -110,6 +117,28 @@ export const API_GROUPS: ApiGroup[] = [
     basePath: '/auto-lending/v1',
     kind: 'open-finance',
     commercialModel: 'Per-dealer SaaS tier + per-disbursement fee',
+    customBadge: 'Custom · Auto Lending',
+    server: 'https://qantara-api.omtd.bankdhofar.com/auto-lending/v1',
+    auth: 'OAuth2 client_credentials + mTLS (no consent)',
+  },
+  // ─────────────────────────────────────────────────────────────
+  // EasyBiz — Partner Service (Hylobiz virtual-account passthrough)
+  // Non-OBIE custom section on the unified API host.
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: 'easybiz',
+    name: 'EasyBiz — Virtual Accounts',
+    description: 'Partner-service API for on-demand virtual-account generation, fronting the EasyBiz / Hylobiz backend. External passthrough — Bank Dhofar relays the authenticated request to the EasyBiz platform. Non-OBIE custom section published on the unified API host.',
+    icon: IconWallet,
+    color: 'teal',
+    version: 'v1.0',
+    endpointCount: 1,
+    basePath: '/easybiz',
+    kind: 'open-finance',
+    commercialModel: 'Partner agreement (EasyBiz / Hylobiz)',
+    customBadge: 'Custom · Partner Service',
+    server: 'https://qantara-api.omtd.bankdhofar.com/easybiz',
+    auth: 'OAuth2 client_credentials + mTLS (passthrough)',
   },
 ];
 
@@ -196,7 +225,7 @@ export default function ApiCatalog() {
                 </Text>
               </div>
               <Badge size="lg" variant="filled" color="yellow" leftSection={<IconSparkles size={12} />}>
-                NEW · Auto Lending
+                NEW · Auto Lending + EasyBiz
               </Badge>
             </Group>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
@@ -260,8 +289,20 @@ function ApiGroupCard({ group, onClick, highlight }: { group: ApiGroup; onClick:
           </Badge>
         </Group>
       </Group>
-      <Text fw={600} size="lg" mb="xs">{group.name}</Text>
+      <Group gap="xs" mb="xs" align="center">
+        <Text fw={600} size="lg">{group.name}</Text>
+        {group.customBadge && (
+          <Badge variant="dot" color="yellow" size="sm">
+            {group.customBadge}
+          </Badge>
+        )}
+      </Group>
       <Text size="sm" c="dimmed" lh={1.6}>{group.description}</Text>
+      {group.auth && (
+        <Text size="xs" c="dimmed" mt="sm">
+          Auth: <Text span fw={500}>{group.auth}</Text>
+        </Text>
+      )}
       {highlight && group.commercialModel && (
         <Box mt="md" p="xs" style={{ background: 'var(--mantine-color-yellow-0)', borderRadius: 6 }}>
           <Text size="xs" fw={600} c="yellow.9">
