@@ -21,7 +21,7 @@ spec:
         - name: gitlab-registry
       containers:
         - name: ob-tpp-manager
-          image: {{ .Values.global.registry }}/{{ .Values.tppManager.image }}:{{ .Values.global.imageTag }}
+          image: {{ .Values.global.registry }}/{{ .Values.tppManager.image }}:{{ .Values.tppManager.tag | default .Values.global.imageTag }}
           ports:
             - containerPort: {{ .Values.tppManager.port }}
               protocol: TCP

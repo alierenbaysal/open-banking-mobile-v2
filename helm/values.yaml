@@ -41,6 +41,9 @@ consentService:
 tppManager:
   replicas: 2
   image: ob-tpp-manager
+  # Latest CI-built tag (pipeline 43856, commit 1700e7b — self-service BFF).
+  # Pinned per-service because portal/tpp-manager build from different commits.
+  tag: "1700e7b5"
   port: 8000
   env:
     KEYCLOAK_URL: "http://keycloak.keycloak.svc.cluster.local:8080"
@@ -48,7 +51,7 @@ tppManager:
     CONSENT_SERVICE_URL: "http://ob-consent-service:8000"
     LOG_LEVEL: "info"
     BFF_CLIENT_ID: "qantara-portal-bff"
-    PORTAL_BASE_URL: "https://qantara.tnd.bankdhofar.com"
+    PORTAL_BASE_URL: "https://qantara.omtd.bankdhofar.com"
     # Stalwart relay (same server GitLab uses; bankdhofar.dev has SPF/DKIM/DMARC).
     SMTP_HOST: "mx.bankdhofar.dev"
     SMTP_PORT: "587"
@@ -109,6 +112,8 @@ theqaService:
 portal:
   replicas: 1
   image: ob-portal
+  # Latest CI-built tag (pipeline 43855, commit d86ef74 — self-service portal UI).
+  tag: "d86ef742"
   port: 80
   resources:
     requests:

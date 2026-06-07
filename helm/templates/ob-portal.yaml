@@ -21,7 +21,7 @@ spec:
         - name: gitlab-registry
       containers:
         - name: ob-portal
-          image: {{ .Values.global.registry }}/{{ .Values.portal.image }}:{{ .Values.global.imageTag }}
+          image: {{ .Values.global.registry }}/{{ .Values.portal.image }}:{{ .Values.portal.tag | default .Values.global.imageTag }}
           ports:
             - containerPort: {{ .Values.portal.port }}
               protocol: TCP
