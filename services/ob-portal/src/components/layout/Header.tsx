@@ -13,7 +13,7 @@ import {
   IconLogout,
   IconChevronDown,
   IconLogin,
-  IconMailForward,
+  IconShieldCog,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -81,10 +81,10 @@ export function Header() {
               </Menu.Item>
               {isAdmin && (
                 <Menu.Item
-                  leftSection={<IconMailForward size={14} />}
-                  onClick={() => navigate('/admin/invitations')}
+                  leftSection={<IconShieldCog size={14} />}
+                  onClick={() => navigate('/admin/console')}
                 >
-                  Invite Partner
+                  Admin Console
                 </Menu.Item>
               )}
               <Menu.Divider />

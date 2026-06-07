@@ -1,7 +1,7 @@
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { theme } from './theme';
 import { AppShell } from './components/layout/AppShell';
 import { AuthProvider } from './components/auth/AuthProvider';
@@ -20,7 +20,7 @@ import AnalyticsPage from './pages/Analytics';
 import GettingStarted from './pages/Content/GettingStarted';
 import LoginPage from './pages/Auth/Login';
 import SignupPage from './pages/Auth/Signup';
-import InvitationsPage from './pages/Admin/Invitations';
+import AdminConsole from './pages/Admin/Console';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,7 +50,11 @@ export default function App() {
                 <Route path="/applications" element={<ApplicationsPage />} />
                 <Route path="/applications/:appId" element={<AppDetailPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
-                <Route path="/admin/invitations" element={<InvitationsPage />} />
+                <Route path="/admin/console" element={<AdminConsole />} />
+                <Route
+                  path="/admin/invitations"
+                  element={<Navigate to="/admin/console" replace />}
+                />
                 <Route path="/getting-started" element={<GettingStarted />} />
               </Route>
             </Routes>

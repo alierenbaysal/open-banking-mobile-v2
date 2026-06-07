@@ -7,7 +7,7 @@ import {
   IconApps,
   IconChartBar,
   IconBook,
-  IconMailForward,
+  IconShieldCog,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { label: 'Sandbox', icon: IconTerminal2, path: '/sandbox', auth: false, admin: false },
   { label: 'My Applications', icon: IconApps, path: '/applications', auth: true, admin: false },
   { label: 'Analytics', icon: IconChartBar, path: '/analytics', auth: true, admin: false },
-  { label: 'Invitations', icon: IconMailForward, path: '/admin/invitations', auth: true, admin: true },
+  { label: 'Admin Console', icon: IconShieldCog, path: '/admin/console', auth: true, admin: true },
 ];
 
 const RESOURCE_ITEMS = [
