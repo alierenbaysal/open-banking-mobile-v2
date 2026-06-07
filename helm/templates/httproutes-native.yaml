@@ -37,6 +37,21 @@ spec:
       backendRefs: [{ name: ob-tpp-manager, port: 8000 }]
     - matches: [{ path: { type: PathPrefix, value: /webhooks/ } }]
       backendRefs: [{ name: ob-event-service, port: 8000 }]
+    # Auto-Lending (Muscat Motors, catalog Section 6) — non-OBIE API onboarded
+    # onto the unified Qantara gateway. Public base path /auto-lending/v1 is
+    # stripped to ROOT so ob-loan-service (FastAPI routes at /) sees
+    # /loan-applications, /healthz, etc. ob-loan-service validates its own OAuth2
+    # client_credentials; the DMZ ob-mtls-gate adds the mTLS requirement for
+    # /auto-lending/v1/*. Same namespace (ob-tnd) as this route, so no
+    # ReferenceGrant is needed. Placed BEFORE the `/` catch-all.
+    - matches: [{ path: { type: PathPrefix, value: /auto-lending/v1 } }]
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs: [{ name: ob-loan-service, port: 8000 }]
     - matches: [{ path: { type: PathPrefix, value: / } }]
       backendRefs: [{ name: ob-portal, port: 80 }]
 {{- range $m := list
