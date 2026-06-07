@@ -246,38 +246,40 @@ export default function GettingStarted() {
               To start building with Bank Dhofar's Open Banking APIs, you need a developer account.
             </Text>
             <List size="sm" spacing="xs">
-              <List.Item>Bank Dhofar invites partners by email with a one-time activation PIN</List.Item>
               <List.Item>
-                Open the <Anchor onClick={() => navigate('/activate')}>account activation</Anchor> page and
-                enter your email and PIN
+                Bank staff and approved partners <Anchor onClick={() => navigate('/login')}>sign in
+                with Microsoft</Anchor> — no separate password or PIN
               </List.Item>
-              <List.Item>Set a password and enrol an authenticator app (TOTP) to secure your account</List.Item>
               <List.Item>
-                Once activated, <Anchor onClick={() => navigate('/login')}>sign in</Anchor> with your
-                password and 6-digit code
+                New partner? <Anchor onClick={() => navigate('/signup')}>Request access</Anchor> and an
+                administrator will review it
+              </List.Item>
+              <List.Item>
+                Once approved, you'll receive a Microsoft invitation by email; accept it, then sign in
+                with your Microsoft account
               </List.Item>
             </List>
             <Group mt="sm">
               <Button
                 size="sm"
                 rightSection={<IconArrowRight size={14} />}
-                onClick={() => navigate('/activate')}
+                onClick={() => navigate('/login')}
               >
-                Activate your account
+                Sign in with Microsoft
               </Button>
               <Button
                 size="sm"
                 variant="light"
                 rightSection={<IconArrowRight size={14} />}
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/signup')}
               >
-                Sign in
+                Request access
               </Button>
             </Group>
             <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" mt="sm">
               <Text size="sm">
-                Don't have an invitation yet? Contact your Bank Dhofar relationship manager to be
-                invited to the Qantara developer portal.
+                Don't have access yet? Request access above or contact your Bank Dhofar relationship
+                manager to be invited to the Qantara developer portal.
               </Text>
             </Alert>
           </Stack>

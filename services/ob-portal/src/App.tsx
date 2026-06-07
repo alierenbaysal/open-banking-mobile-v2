@@ -19,7 +19,6 @@ import AppDetailPage from './pages/Applications/AppDetail';
 import AnalyticsPage from './pages/Analytics';
 import GettingStarted from './pages/Content/GettingStarted';
 import LoginPage from './pages/Auth/Login';
-import ActivatePage from './pages/Auth/Activate';
 import SignupPage from './pages/Auth/Signup';
 import InvitationsPage from './pages/Admin/Invitations';
 
@@ -48,7 +47,6 @@ export default function App() {
                 <Route path="/sandbox" element={<SandboxPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
-                <Route path="/activate" element={<ActivatePage />} />
                 <Route path="/applications" element={<ApplicationsPage />} />
                 <Route path="/applications/:appId" element={<AppDetailPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />

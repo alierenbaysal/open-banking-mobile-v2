@@ -185,11 +185,7 @@ export default function LandingPage() {
             </Group>
             <Group gap="xs" mt={4}>
               <Anchor c="white" fw={500} onClick={() => navigate('/login')} style={{ opacity: 0.95 }}>
-                Sign in
-              </Anchor>
-              <Text c="white" style={{ opacity: 0.7 }}>·</Text>
-              <Anchor c="white" fw={500} onClick={() => navigate('/activate')} style={{ opacity: 0.95 }}>
-                Activate your invitation
+                Sign in with Microsoft
               </Anchor>
             </Group>
           </Stack>

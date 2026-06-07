@@ -20,7 +20,7 @@ import {
   IconInfoCircle,
 } from '@tabler/icons-react';
 import { FormEvent, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../utils/api';
 
 interface SignupResponse {
@@ -41,6 +41,8 @@ function errorCode(err: ApiError): string {
 }
 
 export default function SignupPage() {
+  const [searchParams] = useSearchParams();
+  const awaitingApproval = searchParams.get('status') === 'awaiting-approval';
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [organisation, setOrganisation] = useState('');
@@ -90,10 +92,27 @@ export default function SignupPage() {
           </ThemeIcon>
           <Title order={2}>Request access to Qantara</Title>
           <Text c="dimmed" size="sm" mt={4}>
-            Tell us about yourself. An administrator will review your request and email you an
-            invitation to activate your account.
+            Tell us about yourself. An administrator will review your request and send you a
+            Microsoft invitation once approved.
           </Text>
         </Box>
+
+        {awaitingApproval && (
+          <Alert
+            color="blue"
+            variant="light"
+            icon={<IconInfoCircle size={16} />}
+            w="100%"
+          >
+            <Text size="sm" fw={600} mb={4}>
+              Access pending approval
+            </Text>
+            <Text size="sm">
+              Your access request is still awaiting admin approval. You'll receive a Microsoft
+              invitation by email once an administrator approves it.
+            </Text>
+          </Alert>
+        )}
 
         <Card withBorder w="100%" p="xl">
           {outcome?.kind === 'pending_approval' && (
@@ -102,8 +121,8 @@ export default function SignupPage() {
                 Request submitted
               </Text>
               <Text size="sm">
-                Thanks — you'll receive an email once an admin approves your access. You can then
-                activate your account using the PIN in that email.
+                Thanks — you'll receive a Microsoft invitation by email once an admin approves your
+                access. You can then sign in with your Microsoft account.
               </Text>
             </Alert>
           )}

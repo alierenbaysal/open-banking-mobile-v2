@@ -252,8 +252,8 @@ export default function ApplicationsPage() {
             </Text>
             <Group>
               <Button onClick={() => navigate('/login')}>Sign In</Button>
-              <Button variant="light" onClick={() => navigate('/activate')}>
-                Activate Account
+              <Button variant="light" onClick={() => navigate('/signup')}>
+                Request Access
               </Button>
             </Group>
           </Stack>
