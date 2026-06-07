@@ -14,7 +14,11 @@ import {
   ActionIcon,
   Tooltip,
   Paper,
+  Table,
+  Loader,
+  Center,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
   IconAlertCircle,
   IconMailForward,
@@ -22,13 +26,32 @@ import {
   IconCopy,
   IconSend,
   IconMail,
+  IconUserCheck,
+  IconUserX,
+  IconInbox,
 } from '@tabler/icons-react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { api, ApiError } from '../../utils/api';
 
 interface InviteResponse {
+  email: string;
+  status: string;
+  expires_at: string;
+  emailed: boolean;
+  dev_pin?: string;
+}
+
+interface SignupRequest {
+  email: string;
+  name: string;
+  organisation: string;
+  message: string;
+  requested_at: string;
+}
+
+interface ApproveResponse {
   email: string;
   status: string;
   expires_at: string;
@@ -46,6 +69,76 @@ export default function InvitationsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InviteResponse | null>(null);
+
+  const [requests, setRequests] = useState<SignupRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
+  const [actingOn, setActingOn] = useState<string | null>(null);
+
+  const loadRequests = useCallback(async () => {
+    setRequestsLoading(true);
+    setRequestsError(null);
+    try {
+      const res = await api.get<SignupRequest[]>('/portal-api/auth/signup-requests');
+      setRequests(res.data);
+    } catch {
+      setRequestsError('Could not load access requests. Please try again.');
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && isAdmin) {
+      void loadRequests();
+    }
+  }, [loading, isAdmin, loadRequests]);
+
+  const handleApprove = async (email: string) => {
+    setActingOn(email);
+    try {
+      const res = await api.post<ApproveResponse>('/portal-api/auth/signup-requests/approve', {
+        email,
+      });
+      notifications.show({
+        title: 'Request approved',
+        message: res.data.emailed
+          ? `${email} invited, email sent.`
+          : `${email} invited — email not configured, share the PIN manually.`,
+        color: 'green',
+      });
+      await loadRequests();
+    } catch {
+      notifications.show({
+        title: 'Approval failed',
+        message: `Could not approve ${email}. Please try again.`,
+        color: 'red',
+      });
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  const handleReject = async (email: string) => {
+    setActingOn(email);
+    try {
+      await api.post('/portal-api/auth/signup-requests/reject', { email });
+      notifications.show({
+        title: 'Request rejected',
+        message: `${email} rejected.`,
+        color: 'gray',
+      });
+      await loadRequests();
+    } catch {
+      notifications.show({
+        title: 'Rejection failed',
+        message: `Could not reject ${email}. Please try again.`,
+        color: 'red',
+      });
+    } finally {
+      setActingOn(null);
+    }
+  };
 
   if (!loading && !isAdmin) {
     return (
@@ -111,6 +204,114 @@ export default function InvitationsPage() {
             own password and authenticator setup.
           </Text>
         </div>
+
+        <Card withBorder p="xl">
+          <Group justify="space-between" mb="md">
+            <div>
+              <Title order={4}>Access requests</Title>
+              <Text size="sm" c="dimmed">
+                People who requested access via the public sign-up form. Approve to send them an
+                invitation, or reject to decline.
+              </Text>
+            </div>
+            <Button
+              variant="subtle"
+              size="xs"
+              onClick={() => void loadRequests()}
+              loading={requestsLoading}
+            >
+              Refresh
+            </Button>
+          </Group>
+
+          {requestsError && (
+            <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} mb="md">
+              {requestsError}
+            </Alert>
+          )}
+
+          {requestsLoading && requests.length === 0 ? (
+            <Center py="lg">
+              <Loader size="sm" />
+            </Center>
+          ) : requests.length === 0 ? (
+            <Center py="lg">
+              <Stack align="center" gap="xs">
+                <ThemeIcon size={40} radius="xl" color="gray" variant="light">
+                  <IconInbox size={22} />
+                </ThemeIcon>
+                <Text size="sm" c="dimmed">
+                  No pending access requests.
+                </Text>
+              </Stack>
+            </Center>
+          ) : (
+            <Table.ScrollContainer minWidth={680}>
+              <Table verticalSpacing="sm" highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Email</Table.Th>
+                    <Table.Th>Name</Table.Th>
+                    <Table.Th>Organisation</Table.Th>
+                    <Table.Th>Message</Table.Th>
+                    <Table.Th>Requested</Table.Th>
+                    <Table.Th ta="right">Actions</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {requests.map((req) => (
+                    <Table.Tr key={req.email}>
+                      <Table.Td style={{ wordBreak: 'break-all' }}>{req.email}</Table.Td>
+                      <Table.Td>{req.name || <Text c="dimmed">—</Text>}</Table.Td>
+                      <Table.Td>{req.organisation || <Text c="dimmed">—</Text>}</Table.Td>
+                      <Table.Td maw={260}>
+                        {req.message ? (
+                          <Text size="sm" lineClamp={2}>
+                            {req.message}
+                          </Text>
+                        ) : (
+                          <Text c="dimmed">—</Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm" c="dimmed">
+                          {req.requested_at
+                            ? new Date(req.requested_at).toLocaleString()
+                            : '—'}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap="xs" justify="flex-end" wrap="nowrap">
+                          <Button
+                            size="xs"
+                            color="green"
+                            leftSection={<IconUserCheck size={14} />}
+                            loading={actingOn === req.email}
+                            disabled={actingOn !== null && actingOn !== req.email}
+                            onClick={() => void handleApprove(req.email)}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="red"
+                            leftSection={<IconUserX size={14} />}
+                            loading={actingOn === req.email}
+                            disabled={actingOn !== null && actingOn !== req.email}
+                            onClick={() => void handleReject(req.email)}
+                          >
+                            Reject
+                          </Button>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+          )}
+        </Card>
 
         <Card withBorder p="xl">
           <form onSubmit={handleSubmit}>

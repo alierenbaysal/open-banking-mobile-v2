@@ -24,6 +24,7 @@ import {
   IconApi,
   IconTerminal2,
   IconBook,
+  IconUserPlus,
 } from '@tabler/icons-react';
 
 const API_FEATURES = [
@@ -171,6 +172,15 @@ export default function LandingPage() {
                 }}
               >
                 Explore APIs
+              </Button>
+              <Button
+                size="lg"
+                variant="white"
+                color="bankGreen"
+                rightSection={<IconUserPlus size={18} />}
+                onClick={() => navigate('/signup')}
+              >
+                Request Access
               </Button>
             </Group>
             <Group gap="xs" mt={4}>

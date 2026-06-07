@@ -124,14 +124,24 @@ export default function LoginPage() {
           </form>
         </Card>
 
-        <Group gap={4}>
-          <Text size="sm" c="dimmed">
-            Have an invitation?
-          </Text>
-          <Anchor size="sm" component={Link} to="/activate">
-            Activate your account
-          </Anchor>
-        </Group>
+        <Stack align="center" gap={4}>
+          <Group gap={4}>
+            <Text size="sm" c="dimmed">
+              No account yet?
+            </Text>
+            <Anchor size="sm" component={Link} to="/signup">
+              Request access
+            </Anchor>
+          </Group>
+          <Group gap={4}>
+            <Text size="sm" c="dimmed">
+              Have an invite?
+            </Text>
+            <Anchor size="sm" component={Link} to="/activate">
+              Activate
+            </Anchor>
+          </Group>
+        </Stack>
       </Stack>
     </Container>
   );
