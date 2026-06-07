@@ -66,19 +66,31 @@ func main() {
 	signer := session.NewSigner(sessionSecret)
 
 	// Bootstrap Keycloak: ensure the partner roles and the confidential portal
-	// BFF client (direct access grants) exist. Idempotent; tolerant of Keycloak
-	// being briefly unreachable at startup.
-	if err := kcClient.EnsureRealmRole("tpp-developer"); err != nil {
-		logger.Warn("could not ensure realm role tpp-developer", "error", err)
+	// BFF client (direct access grants) exist. Idempotent. This is RETRIED with
+	// backoff because at pod startup the Istio sidecar's outbound may not be ready
+	// yet (connection refused to Keycloak); without the retry the BFF client would
+	// never get created and partner login would be permanently broken until a
+	// restart. (The pod also sets holdApplicationUntilProxyStarts, which normally
+	// makes the first attempt succeed; the retry is belt-and-suspenders.)
+	var bffSecret string
+	for attempt := 1; attempt <= 12; attempt++ {
+		if err := kcClient.EnsureRealmRole("tpp-developer"); err != nil {
+			logger.Warn("could not ensure realm role tpp-developer", "attempt", attempt, "error", err)
+		}
+		if err := kcClient.EnsureRealmRole("qantara-admin"); err != nil {
+			logger.Warn("could not ensure realm role qantara-admin", "attempt", attempt, "error", err)
+		}
+		uuid, secret, err := kcClient.EnsureBFFClient(cfg.BFFClientID)
+		if err == nil {
+			bffSecret = secret
+			logger.Info("portal BFF client ready", "client_id", cfg.BFFClientID, "kc_id", uuid, "attempt", attempt)
+			break
+		}
+		logger.Warn("BFF bootstrap not ready (Keycloak unreachable?), retrying", "attempt", attempt, "error", err)
+		time.Sleep(5 * time.Second)
 	}
-	if err := kcClient.EnsureRealmRole("qantara-admin"); err != nil {
-		logger.Warn("could not ensure realm role qantara-admin", "error", err)
-	}
-	bffUUID, bffSecret, err := kcClient.EnsureBFFClient(cfg.BFFClientID)
-	if err != nil {
-		logger.Error("could not ensure portal BFF client — partner login unavailable until Keycloak is reachable", "error", err)
-	} else {
-		logger.Info("portal BFF client ready", "client_id", cfg.BFFClientID, "kc_id", bffUUID)
+	if bffSecret == "" {
+		logger.Error("portal BFF client bootstrap failed after retries — partner login unavailable until next successful restart")
 	}
 
 	// Build router.

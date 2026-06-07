@@ -13,6 +13,11 @@ spec:
       app: ob-tpp-manager
   template:
     metadata:
+      annotations:
+        # Wait for the Envoy sidecar's outbound to be ready before starting the
+        # app, so the startup Keycloak bootstrap (BFF client + roles) doesn't hit
+        # connection-refused during the sidecar race.
+        proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
       labels:
         app: ob-tpp-manager
         app.kubernetes.io/part-of: qantara
