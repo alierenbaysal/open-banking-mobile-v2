@@ -128,11 +128,11 @@ export const API_GROUPS: ApiGroup[] = [
   {
     id: 'easybiz',
     name: 'EasyBiz — Virtual Accounts',
-    description: 'Partner-service API for on-demand virtual-account generation, fronting the EasyBiz / Hylobiz backend. External passthrough — Bank Dhofar relays the authenticated request to the EasyBiz platform. Non-OBIE custom section published on the unified API host.',
+    description: 'Partner-service API suite for customer management, virtual accounts, and payment collection, fronting the EasyBiz backend (easybiz.dob.bankdhofar.com). External passthrough — Bank Dhofar relays the authenticated request to the EasyBiz platform. Non-OBIE custom section published on the unified API host.',
     icon: IconWallet,
     color: 'teal',
     version: 'v1.0',
-    endpointCount: 1,
+    endpointCount: 10,
     basePath: '/easybiz',
     kind: 'open-finance',
     commercialModel: 'Partner agreement (EasyBiz / Hylobiz)',
