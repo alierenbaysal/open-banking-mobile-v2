@@ -50,6 +50,68 @@ func (c *Client) FindUserByEmail(email string) (*User, bool, error) {
 	return nil, false, nil
 }
 
+// ListUsersByAttribute returns users whose attribute attrKey equals attrVal.
+// It first tries Keycloak's indexed attribute search (q=key:val); if that is
+// unavailable (older Keycloak, or the attribute isn't indexed) it falls back to
+// enumerating users and filtering client-side.
+func (c *Client) ListUsersByAttribute(attrKey, attrVal string) ([]User, error) {
+	q := url.QueryEscape(fmt.Sprintf("%s:%s", attrKey, attrVal))
+	resp, err := c.doRequest(http.MethodGet,
+		fmt.Sprintf("/users?q=%s&briefRepresentation=false&max=1000", q), nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
+		var users []User
+		if derr := json.NewDecoder(resp.Body).Decode(&users); derr != nil {
+			return nil, fmt.Errorf("failed to decode attribute search: %w", derr)
+		}
+		// The q-search is best-effort on the server; confirm the match locally.
+		out := make([]User, 0, len(users))
+		for i := range users {
+			if attrEquals(users[i].Attributes, attrKey, attrVal) {
+				out = append(out, users[i])
+			}
+		}
+		return out, nil
+	}
+	resp.Body.Close()
+
+	// Fallback: enumerate and filter.
+	resp, err = c.doRequest(http.MethodGet, "/users?max=1000&briefRepresentation=false", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("keycloak user enumerate returned %d: %s", resp.StatusCode, string(body))
+	}
+	var all []User
+	if err := json.NewDecoder(resp.Body).Decode(&all); err != nil {
+		return nil, fmt.Errorf("failed to decode user enumerate: %w", err)
+	}
+	out := make([]User, 0)
+	for i := range all {
+		if attrEquals(all[i].Attributes, attrKey, attrVal) {
+			out = append(out, all[i])
+		}
+	}
+	return out, nil
+}
+
+func attrEquals(m map[string][]string, key, val string) bool {
+	if v, ok := m[key]; ok {
+		for _, x := range v {
+			if x == val {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // CreateUser creates an enabled user (no password yet) with the given attributes
 // and returns the Keycloak user id.
 func (c *Client) CreateUser(email, name string, attributes map[string][]string) (string, error) {

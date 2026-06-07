@@ -27,9 +27,15 @@ const (
 	attrTPP         = "tpp_client_id"
 	attrTOTP        = "totp_secret"
 	attrTOTPPending = "totp_pending"
+	attrAdmin       = "onb_admin"
+	attrOrg         = "onb_org"
+	attrMsg         = "onb_msg"
+	attrReqAt       = "onb_requested_at"
 
-	statusInvited = "invited"
-	statusActive  = "active"
+	statusInvited  = "invited"
+	statusActive   = "active"
+	statusPending  = "pending"
+	statusRejected = "rejected"
 
 	activationTTL = 15 * time.Minute
 	pinTTL        = 24 * time.Hour
@@ -63,6 +69,22 @@ func (h *Handler) Invite(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	resp, err := h.sendInvite(userID, email, req.Name, req.TPPClient, req.Admin)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "keycloak_error", err.Error())
+		return
+	}
+
+	h.logger.Info("invited partner", "email", email, "emailed", resp.Emailed, "tpp", req.TPPClient, "admin", req.Admin)
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+// sendInvite generates a one-time PIN, stores the invite attributes (status =
+// invited), best-effort assigns the tpp-developer realm role, optionally marks
+// the user as an admin, and emails the PIN. Shared by the admin Invite handler
+// and the self-signup approval flow. Returns the InviteResponse the caller emits.
+func (h *Handler) sendInvite(userID, email, name, tppClient string, admin bool) (models.InviteResponse, error) {
 	if err := h.kc.AddRealmRoleToUser(userID, "tpp-developer"); err != nil {
 		h.logger.Warn("could not assign tpp-developer role", "email", email, "error", err)
 	}
@@ -76,17 +98,19 @@ func (h *Handler) Invite(w http.ResponseWriter, r *http.Request) {
 		attrPinExp:  {strconv.FormatInt(exp.Unix(), 10)},
 		attrStatus:  {statusInvited},
 	}
-	if req.TPPClient != "" {
-		attrs[attrTPP] = []string{req.TPPClient}
+	if tppClient != "" {
+		attrs[attrTPP] = []string{tppClient}
+	}
+	if admin {
+		attrs[attrAdmin] = []string{"true"}
 	}
 	if err := h.kc.SetUserAttributes(userID, attrs); err != nil {
-		writeError(w, http.StatusBadGateway, "keycloak_error", "Failed to store invite: "+err.Error())
-		return
+		return models.InviteResponse{}, fmt.Errorf("Failed to store invite: %w", err)
 	}
 
 	resp := models.InviteResponse{Email: email, Status: statusInvited, ExpiresAt: exp}
 	if h.mailer.Enabled() {
-		if err := h.mailer.Send(email, "Your Qantara sandbox invitation", inviteEmailHTML(req.Name, pin, h.portalBaseURL, exp)); err != nil {
+		if err := h.mailer.Send(email, "Your Qantara sandbox invitation", inviteEmailHTML(name, pin, h.portalBaseURL, exp)); err != nil {
 			h.logger.Error("invite email send failed", "email", email, "error", err)
 			resp.DevPIN = pin // sandbox fallback so the flow stays testable
 		} else {
@@ -95,9 +119,7 @@ func (h *Handler) Invite(w http.ResponseWriter, r *http.Request) {
 	} else {
 		resp.DevPIN = pin
 	}
-
-	h.logger.Info("invited partner", "email", email, "emailed", resp.Emailed, "tpp", req.TPPClient)
-	writeJSON(w, http.StatusCreated, resp)
+	return resp, nil
 }
 
 // VerifyPIN validates the emailed PIN and returns a short-lived activation ticket.
@@ -237,7 +259,7 @@ func (h *Handler) TOTPVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc := session.Claims{Subject: c.Subject, Email: c.Email, Name: c.Name, TPP: c.TPP, Roles: []string{"tpp-developer"}}
+	sc := session.Claims{Subject: c.Subject, Email: c.Email, Name: c.Name, TPP: c.TPP, Roles: rolesForUser(attrs)}
 	if err := h.setSessionCookie(w, sc); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to start session")
 		return
@@ -281,7 +303,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc := session.Claims{Subject: u.ID, Email: email, Name: u.FirstName, TPP: attrGet(u.Attributes, attrTPP), Roles: []string{"tpp-developer"}}
+	sc := session.Claims{Subject: u.ID, Email: email, Name: u.FirstName, TPP: attrGet(u.Attributes, attrTPP), Roles: rolesForUser(u.Attributes)}
 	if err := h.setSessionCookie(w, sc); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to start session")
 		return
@@ -307,6 +329,16 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- helpers ---
+
+// rolesForUser derives the session roles from the user's onboarding attributes.
+// Every partner is a tpp-developer; users flagged onb_admin=true additionally
+// carry qantara-admin so requireAdmin's session path and the admin UI work.
+func rolesForUser(attrs map[string][]string) []string {
+	if attrGet(attrs, attrAdmin) == "true" {
+		return []string{"tpp-developer", "qantara-admin"}
+	}
+	return []string{"tpp-developer"}
+}
 
 func attrGet(m map[string][]string, key string) string {
 	if v, ok := m[key]; ok && len(v) > 0 {

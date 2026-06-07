@@ -15,6 +15,31 @@ type InviteRequest struct {
 	Email     string `json:"email"`
 	Name      string `json:"name,omitempty"`
 	TPPClient string `json:"tpp_client_id,omitempty"` // link the user to an existing TPP
+	Admin     bool   `json:"admin,omitempty"`         // mint this user as a Qantara admin
+}
+
+// SignupRequest is a public, unauthenticated request for sandbox access. It
+// creates a PENDING user that an admin must approve before any PIN is sent.
+type SignupRequest struct {
+	Email        string `json:"email"`
+	Name         string `json:"name,omitempty"`
+	Organisation string `json:"organisation,omitempty"`
+	Message      string `json:"message,omitempty"`
+}
+
+// SignupRequestItem is one entry in the admin pending-signups queue.
+type SignupRequestItem struct {
+	Email        string `json:"email"`
+	Name         string `json:"name,omitempty"`
+	Organisation string `json:"organisation,omitempty"`
+	Message      string `json:"message,omitempty"`
+	RequestedAt  int64  `json:"requested_at"`
+}
+
+// SignupDecisionRequest approves or rejects a pending signup by email.
+type SignupDecisionRequest struct {
+	Email string `json:"email"`
+	Admin bool   `json:"admin,omitempty"` // optionally mint the approved user as an admin
 }
 
 // InviteResponse confirms an invite was created and emailed.

@@ -27,6 +27,10 @@ func NewRouter(d Deps) http.Handler {
 	// every screen is native Qantara UI driven by these endpoints.
 	r.Route("/portal-api/auth", func(r chi.Router) {
 		r.Post("/invite", h.requireAdmin(h.Invite)) // admin session or X-Admin-Key
+		r.Post("/signup", h.Signup)                 // public — gated self-signup request
+		r.Get("/signup-requests", h.requireAdmin(h.SignupRequests))
+		r.Post("/signup-requests/approve", h.requireAdmin(h.ApproveSignup))
+		r.Post("/signup-requests/reject", h.requireAdmin(h.RejectSignup))
 		r.Post("/verify-pin", h.VerifyPIN)
 		r.Post("/set-password", h.SetPassword)
 		r.Post("/totp/init", h.TOTPInit)
