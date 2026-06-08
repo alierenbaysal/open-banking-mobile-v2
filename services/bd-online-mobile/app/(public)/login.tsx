@@ -210,6 +210,34 @@ export default function LoginScreen() {
             style={{ marginTop: spacing.md }}
           />
 
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              router.push("/(public)/theqa");
+            }}
+            disabled={submitting}
+            style={({ pressed }) => [
+              styles.theqaButton,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={styles.theqaButtonText}>Continue with THEQA</Text>
+          </Pressable>
+          <Text style={styles.theqaHint}>
+            Register or sign in with your national digital identity
+          </Text>
+
           <Text style={styles.footnote}>
             Secured by Bank Dhofar. Your session is encrypted end-to-end.
           </Text>
@@ -322,6 +350,37 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   eye: { padding: spacing.md },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { fontSize: 12, color: colors.textFaint, fontWeight: "600" },
+  theqaButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  theqaButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  theqaHint: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: spacing.sm,
+  },
   footnote: {
     fontSize: 11,
     color: colors.textFaint,

@@ -17,6 +17,12 @@ spec:
         app: ob-theqa-service
         app.kubernetes.io/part-of: qantara
     spec:
+      # MTCIT THEQA SAS staging IdP is reached by IP over the IPsec tunnel; the
+      # SAML endpoints use the hostname, so pin it here (per MTCIT/Asma 2026-05-21).
+      hostAliases:
+        - ip: "10.31.10.22"
+          hostnames:
+            - "stg-idp-pki.mtcit.gov.om"
       imagePullSecrets:
         - name: gitlab-registry
       containers:

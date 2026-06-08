@@ -7,6 +7,7 @@ Reads from the ``qantara`` PostgreSQL database (customers, accounts, transaction
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import secrets
 import time
@@ -191,6 +192,13 @@ class MasroofiRegisterRequest(BaseModel):
 class BankAuthLoginRequest(BaseModel):
     email: str = Field(..., min_length=1, max_length=255)
     password: str = Field(..., min_length=1, max_length=255)
+
+
+class ThequaAuthRequest(BaseModel):
+    # The unguessable verification reference (UUID) issued by ob-theqa-service.
+    # The national identity itself is never sent by the client — it is read
+    # server-side from the verified theqa_verifications row.
+    reference: str = Field(..., min_length=1, max_length=64)
 
 
 class MasroofiLoginRequest(BaseModel):
@@ -501,6 +509,143 @@ async def bank_auth_login(req: BankAuthLoginRequest, response: Response) -> dict
         "first_name": row["first_name"],
         "last_name": row["last_name"],
         "accounts": [r["account_id"] for r in acct_rows],
+    }
+
+
+# ── THEQA (MTCIT national digital identity) auth ───────────────────────
+#
+# THEQA proves *identity* via SAML (handled by ob-theqa-service, which writes
+# the verified national_id into the shared `theqa_verifications` table). This
+# endpoint turns a completed verification into a bank session — the same
+# `customers`/session machinery as password login — so the two converge.
+
+_THEQA_COLUMN_READY = False
+
+
+async def _ensure_theqa_columns(conn) -> None:
+    """Add the national_id column + unique index to customers (idempotent)."""
+    global _THEQA_COLUMN_READY
+    if _THEQA_COLUMN_READY:
+        return
+    await conn.execute(
+        "ALTER TABLE customers ADD COLUMN IF NOT EXISTS national_id VARCHAR(64)"
+    )
+    await conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_national_id "
+        "ON customers (national_id) WHERE national_id IS NOT NULL"
+    )
+    _THEQA_COLUMN_READY = True
+
+
+def _theqa_names(name_id: str | None, attributes: dict | None) -> tuple[str, str]:
+    """Derive (first_name, last_name) from the THEQA assertion."""
+    attrs = attributes or {}
+
+    def pick(*keys: str) -> str | None:
+        for k in keys:
+            v = attrs.get(k)
+            if isinstance(v, list):
+                v = v[0] if v else None
+            if v:
+                return str(v)
+        return None
+
+    first = pick("firstName", "first_name", "givenName", "given_name")
+    last = pick("lastName", "last_name", "surname", "familyName", "family_name")
+    if not first:
+        full = pick("fullName", "full_name", "name", "displayName") or (name_id or "")
+        parts = full.strip().split()
+        if parts:
+            first = parts[0]
+            last = last or (" ".join(parts[1:]) if len(parts) > 1 else "")
+    return (first or "THEQA", last or "User")
+
+
+@router.post("/bank-auth/theqa")
+async def bank_auth_theqa(req: ThequaAuthRequest, response: Response) -> dict[str, Any]:
+    """Establish a bank session from a completed THEQA verification.
+
+    The client sends only the verification `reference`; the verified national
+    identity is read server-side. Create-or-find the customer by national_id —
+    onboard on first sign-in, log in thereafter.
+    """
+    _set_rate_limit_headers(response)
+
+    try:
+        ref_uuid = str(uuid.UUID(req.reference))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Unknown verification reference")
+
+    async with acquire() as conn:
+        ver = await conn.fetchrow(
+            "SELECT status, national_id, name_id, attributes "
+            "FROM theqa_verifications WHERE reference = $1::uuid",
+            ref_uuid,
+        )
+
+    if ver is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Unknown verification reference")
+    if ver["status"] != "verified":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"Verification is {ver['status']}, not verified")
+    national_id = ver["national_id"]
+    if not national_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Verification carries no national identifier")
+
+    attributes = ver["attributes"]
+    if isinstance(attributes, str):
+        try:
+            attributes = json.loads(attributes)
+        except Exception:
+            attributes = {}
+
+    async with acquire() as conn:
+        await _ensure_theqa_columns(conn)
+
+        cust = await conn.fetchrow(
+            "SELECT customer_id, email, first_name, last_name "
+            "FROM customers WHERE national_id = $1",
+            national_id,
+        )
+
+        onboarded = False
+        if cust is None:
+            first_name, last_name = _theqa_names(ver["name_id"], attributes)
+            customer_id = f"CUST-THEQA-{uuid.uuid4().hex[:8].upper()}"
+            email = f"{customer_id.lower()}@theqa.bankdhofar.local"
+            await conn.execute(
+                """INSERT INTO customers
+                   (customer_id, email, first_name, last_name, national_id, created_at)
+                   VALUES ($1, $2, $3, $4, $5, $6)""",
+                customer_id, email, first_name, last_name, national_id,
+                datetime.now(_TZ_OMAN),
+            )
+            cust = {"customer_id": customer_id, "email": email,
+                    "first_name": first_name, "last_name": last_name}
+            onboarded = True
+
+        customer_id = cust["customer_id"]
+        acct_rows = await conn.fetch(
+            "SELECT account_id FROM accounts WHERE customer_id = $1 ORDER BY account_id",
+            customer_id,
+        )
+
+    await _audit_log(
+        "bank_onboard_theqa" if onboarded else "bank_login_theqa",
+        customer_id=customer_id, success=True,
+        details=f"national_id={str(national_id)[:4]}***",
+    )
+
+    return {
+        "customer_id": customer_id,
+        "email": cust["email"],
+        "first_name": cust["first_name"],
+        "last_name": cust["last_name"],
+        "accounts": [r["account_id"] for r in acct_rows],
+        "onboarded": onboarded,
     }
 
 

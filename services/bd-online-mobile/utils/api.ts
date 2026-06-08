@@ -328,6 +328,56 @@ export async function bankLogin(
   return user;
 }
 
+/**
+ * Establish a bank session from a completed THEQA verification.
+ *
+ * The caller passes only the verification `reference`; the national identity
+ * is read server-side. The bank creates the customer on first sign-in
+ * (onboard) or finds the existing one (login), returning the same BankUser as
+ * password login. `onboarded` is true when this was a first-time registration.
+ */
+export async function bankLoginWithTheqa(
+  reference: string,
+): Promise<BankUser & { onboarded?: boolean }> {
+  const url = `${API_BASE}/api/bank-auth/theqa`;
+  const init: RequestInit = {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ reference }),
+  };
+  if (Platform.OS === "web") {
+    (init as RequestInit & { credentials?: RequestCredentials }).credentials =
+      "include";
+  }
+
+  const resp = await fetch(url, init);
+  const text = await resp.text();
+  if (!resp.ok) {
+    let detail = "THEQA sign-in failed";
+    try {
+      const j = JSON.parse(text);
+      detail = j.detail || j.message || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(detail, resp.status, text);
+  }
+
+  if (Platform.OS !== "web") {
+    const setCookie = resp.headers.get("set-cookie");
+    if (setCookie) {
+      const match = setCookie.match(/manara_session=([^;]+)/);
+      if (match) {
+        await setSessionCookie(match[1]);
+      }
+    }
+  }
+
+  const user = JSON.parse(text) as BankUser & { onboarded?: boolean };
+  await setStoredUser(user);
+  return user;
+}
+
 export async function bankLogout(): Promise<void> {
   // Best-effort server logout; ignore errors.
   try {
