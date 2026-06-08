@@ -21,7 +21,7 @@ spec:
         - name: gitlab-registry
       containers:
         - name: ob-consent-service
-          image: {{ .Values.global.registry }}/{{ .Values.consentService.image }}:{{ .Values.global.imageTag }}
+          image: {{ .Values.global.registry }}/{{ .Values.consentService.image }}:{{ .Values.consentService.tag | default .Values.global.imageTag }}
           ports:
             - containerPort: {{ .Values.consentService.port }}
               protocol: TCP
@@ -31,7 +31,9 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: qantara-db-credentials
+                  # CNPG source-of-truth credential (auto-maintained on rotation).
+                  # The legacy qantara-db-credentials convenience secret drifts.
+                  name: qantara-postgres-app
                   key: uri
             - name: LOG_LEVEL
               value: {{ .Values.consentService.env.LOG_LEVEL | quote }}

@@ -204,5 +204,6 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: qantara-db-credentials
+                  # CNPG source-of-truth credential (auto-maintained on rotation).
+                  name: qantara-postgres-app
                   key: uri

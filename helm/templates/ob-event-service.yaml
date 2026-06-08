@@ -31,7 +31,9 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: qantara-db-credentials
+                  # CNPG source-of-truth credential (auto-maintained on rotation).
+                  # The legacy qantara-db-credentials convenience secret drifts.
+                  name: qantara-postgres-app
                   key: uri
             - name: WEBHOOK_MAX_RETRIES
               value: {{ .Values.eventService.env.WEBHOOK_MAX_RETRIES | quote }}
