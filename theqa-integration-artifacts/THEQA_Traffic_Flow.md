@@ -42,11 +42,11 @@ sequenceDiagram
     Note over SP: cert loaded OK, but start crashes before AuthnRequest<br>SP image missing python-multipart ❌
     end
 
-    rect rgb(223,247,223)
-    Note over SP,IDP: CHANNEL 2 — BD initiates over the ONE-WAY tunnel
+    rect rgb(255,224,224)
+    Note over SP,IDP: CHANNEL 2 — BD initiates over the tunnel
     SP->>NAT: AuthnRequest to SAS
-    NAT->>IDP: src SNAT 172.16.24.1 dst 10.31.10.22 port 443  ❓ NOT TESTED
-    Note over NAT,IDP: cannot originate as the NAT source, MTCIT states reachable
+    NAT->>IDP: dst 10.31.10.22 port 443  ❌ FAILED telnet TIMED OUT from DMZ
+    Note over NAT,IDP: all 3 dests time out from DMZ, yet MTCIT says reachable<br>BD-side egress/NAT path gap, not MTCIT
     end
 
     rect rgb(255,247,219)
@@ -107,18 +107,23 @@ as the `172.16.24.1` NAT).
 |---|---------|-----|-------------------------|--------|
 | 1a | Public | Ingress → SP reachability | `GET /auth/saml/metadata`, `/health` via `158.179.3.104` | **OK** — `200` |
 | 1b | Public | Start verification / build AuthnRequest | `POST /auth/verifications` via ingress | **FAILED** — `500`, SP image missing `python-multipart` (`saml.py:53`) |
-| 2 | Tunnel | BD → SAS IdP (outbound, NAT) | — cannot source as `172.16.24.1` | **NOT TESTED** — MTCIT states reachable (2026-06-03) |
-| — | BD-side | DMZ pod → `172.16.24.1:443` / `172.16.24.2:443` | `nc`/ping from `theqa-egress` pod | **FAILED** — 100% loss / timeout (note: `.1` is source-NAT, no listener expected; pod egress is Calico `10.244.x`) |
+| 2 | Tunnel | BD → SAS/DSS/Self-Service (outbound) | telnet from DMZ to `10.31.10.22` / `.31` / `.33:443` | **FAILED** — all 3 **timed out** (port not open from DMZ) |
 | 3 | Out-of-band | THEQA app ↔ MTCIT, user approves | — MTCIT side | **NOT TESTED** |
 | 4 | Tunnel | MTCIT → BD ACS (inbound, THEQA-originated) | — cannot originate | **NOT TESTED** |
 | 5 | Public | App polls verification result | `GET /auth/verifications/{ref}` via ingress | **OK** — `404` on unknown (healthy) |
 | 6 | Public | App → consent `/bank-auth/theqa` | `POST /banking/bank-auth/theqa` (internal) | **OK** — `404` on unknown (healthy) |
 
-**Bottom line of testing:** the BD public surface is up (ingress, SP metadata, poll endpoint,
-consent provisioning), **but the start-verification call `POST /auth/verifications` returns 500**
-because the SP container is missing the `python-multipart` dependency — a real, fixable bug
-(add to `requirements.txt`, rebuild). The MTCIT-facing legs (outbound via the NAT, inbound from
-THEQA) I genuinely cannot originate, so they are marked NOT TESTED.
+**Bottom line of testing — two distinct BD-side problems:**
+1. **Internal SP bug:** `POST /auth/verifications` → `500` because the SP container is missing
+   `python-multipart`. Nothing to do with MTCIT. Fix: add the dep, rebuild, redeploy.
+2. **BD egress to MTCIT FAILS:** telnet from the DMZ to all 3 destinations
+   (`10.31.10.22 / .31 / .33:443`) **times out**, even though MTCIT confirms they are reachable.
+   So our DMZ-OKE traffic is **not** leaving as `172.16.24.1` / not landing on the tunnel — a
+   **BD-side egress/NAT/routing gap** (DMZ subnet route to the DRG, the firewall NAT rule covering
+   the OKE node source, or Calico `natOutgoing`). This is the thing to chase with the network team.
+
+The inbound leg (MTCIT → ACS) and the out-of-band THEQA-app leg I genuinely cannot originate →
+NOT TESTED.
 
 ---
 
