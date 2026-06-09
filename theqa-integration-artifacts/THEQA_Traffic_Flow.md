@@ -39,7 +39,7 @@ sequenceDiagram
     Note over App,ING: CHANNEL 1 — PUBLIC, mobile talks ONLY to BD
     App->>ING: GET /auth/saml/metadata and /health  ✅ OK 200
     App->>ING: POST /auth/verifications  ✅ OK 201 builds signed SAMLRequest
-    Note over SP: python-multipart added; AuthnRequest signed, redirect targets stg-idp-pki.mtcit.gov.om ✅
+    Note over SP: python-multipart added, AuthnRequest signed, redirect targets stg-idp-pki.mtcit.gov.om ✅
     end
 
     rect rgb(223,247,223)
@@ -59,7 +59,7 @@ sequenceDiagram
     Note over IDP,SP: CHANNEL 2 inbound — MTCIT connects as 172.16.24.2 (mirror of outbound)
     IDP->>NAT: SAML Response POST, src 10.31.10.x dst 172.16.24.2 port 443  ❓ NOT TESTED, cannot originate
     NAT->>SP: DNAT to ingress 10.150.70.90 then host then /auth/saml/acs
-    Note over SP: python-multipart fixed; ACS parses a real assertion ✅<br>confirm 172.16.24.2 to 10.150.70.90 routes the ACS host to the SP
+    Note over SP: python-multipart fixed, ACS parses a real assertion ✅<br>confirm 172.16.24.2 to 10.150.70.90 routes the ACS host to the SP
     end
 
     rect rgb(223,238,255)
