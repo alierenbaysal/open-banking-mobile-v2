@@ -55,10 +55,11 @@ sequenceDiagram
     THQ->>IDP: user approves national ID
     end
 
-    rect rgb(223,247,223)
-    Note over IDP,SP: SAML Response back to ACS, THEQA-originated  ❓ NOT TESTED
-    IDP->>NAT: SAML Response, dst 172.16.24.2 port 443 NATed
-    NAT->>SP: DNAT to BD ingress then /auth/saml/acs
+    rect rgb(255,224,224)
+    Note over IDP,SP: CHANNEL 2 inbound — MTCIT connects as 172.16.24.2 (mirror of outbound)
+    IDP->>NAT: SAML Response POST, src 10.31.10.x dst 172.16.24.2 port 443  ❓ NOT TESTED, cannot originate
+    NAT->>SP: DNAT to ingress 10.150.70.90 then host then /auth/saml/acs
+    Note over SP: ACS form POST tested locally returns 500 — SAME python-multipart bug ❌<br>also confirm 172.16.24.2 to 10.150.70.90 routes the ACS host to the SP
     end
 
     rect rgb(223,238,255)
@@ -74,25 +75,14 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph BD["BankDhofar side — touches only 172.16.24.x"]
-        APP["📱 BD Online app"]
-        ING["🌐 DMZ ingress 158.179.3.104"]
-        SP["🔐 ob-theqa-service SP RTZ"]
-        NAT["🔁 NAT + IPsec edge 212.72.7.195<br>out src to 172.16.24.1<br>in dst 172.16.24.2"]
-    end
-    subgraph TUN["IPsec tunnel — one-way, operational"]
-        T["BD 212.72.7.195 to MTCIT 188.65.26.226"]
-    end
-    subgraph MTCIT["MTCIT side — 10.31.10.x, beyond tunnel, NOT routed for BD"]
-        SAS["SAS IdP 10.31.10.22"]
-        DSS["DSS 10.31.10.31"]
-        SS["Self-Service 10.31.10.33"]
-    end
-    APP --> ING --> SP --> NAT
-    NAT --> T
-    T --> SAS
-    T --> DSS
-    T --> SS
+    SP["🔐 BD SP + egress<br>OCI DMZ node 10.150.69.x"]
+    DRG["OCI DRG drg-hub<br>VCN RT 10.0.0.0/8 and 172.16.0.0/12 to DRG ✅"]
+    VC["FastConnect 3 VCs BGP UP ✅<br>DRG routes 10.31.10.0/24 and 172.16.0.0/16"]
+    CISCO["🔁 on-prem Cisco 212.72.7.195<br>SNAT out 172.16.24.1<br>DNAT in 172.16.24.2"]
+    MTCIT["🇴🇲 MTCIT via IPsec tunnel<br>SAS 10.31.10.22 DSS .31 Self-Service .33"]
+
+    SP -->|outbound ✅ open and TLS| DRG --> VC --> CISCO -->|tunnel| MTCIT
+    MTCIT -.->|inbound connects as 172.16.24.2 ❓| CISCO -.-> VC -.-> DRG -.-> SP
 ```
 
 ---
