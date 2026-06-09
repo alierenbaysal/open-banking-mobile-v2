@@ -27,7 +27,7 @@ spec:
         - name: gitlab-registry
       containers:
         - name: ob-theqa-service
-          image: {{ .Values.global.registry }}/{{ .Values.theqaService.image }}:{{ .Values.global.imageTag }}
+          image: {{ .Values.global.registry }}/{{ .Values.theqaService.image }}:{{ .Values.theqaService.tag | default .Values.global.imageTag }}
           ports:
             - containerPort: {{ .Values.theqaService.port }}
               protocol: TCP

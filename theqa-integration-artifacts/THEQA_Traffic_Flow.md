@@ -38,8 +38,8 @@ sequenceDiagram
     rect rgb(223,238,255)
     Note over App,ING: CHANNEL 1 — PUBLIC, mobile talks ONLY to BD
     App->>ING: GET /auth/saml/metadata and /health  ✅ OK 200
-    App->>ING: POST /auth/verifications  ❌ FAILED 500
-    Note over SP: cert loaded OK, but start crashes before AuthnRequest<br>SP image missing python-multipart ❌
+    App->>ING: POST /auth/verifications  ✅ OK 201 builds signed SAMLRequest
+    Note over SP: python-multipart added; AuthnRequest signed, redirect targets stg-idp-pki.mtcit.gov.om ✅
     end
 
     rect rgb(223,247,223)
@@ -59,7 +59,7 @@ sequenceDiagram
     Note over IDP,SP: CHANNEL 2 inbound — MTCIT connects as 172.16.24.2 (mirror of outbound)
     IDP->>NAT: SAML Response POST, src 10.31.10.x dst 172.16.24.2 port 443  ❓ NOT TESTED, cannot originate
     NAT->>SP: DNAT to ingress 10.150.70.90 then host then /auth/saml/acs
-    Note over SP: ACS form POST tested locally returns 500 — SAME python-multipart bug ❌<br>also confirm 172.16.24.2 to 10.150.70.90 routes the ACS host to the SP
+    Note over SP: python-multipart fixed; ACS parses a real assertion ✅<br>confirm 172.16.24.2 to 10.150.70.90 routes the ACS host to the SP
     end
 
     rect rgb(223,238,255)
@@ -96,16 +96,17 @@ as the `172.16.24.1` NAT).
 | # | Channel | Leg | What I ran (2026-06-09) | Result |
 |---|---------|-----|-------------------------|--------|
 | 1a | Public | Ingress → SP reachability | `GET /auth/saml/metadata`, `/health` via `158.179.3.104` | **OK** — `200` |
-| 1b | Public | Start verification / build AuthnRequest | `POST /auth/verifications` via ingress | **FAILED** — `500`, SP image missing `python-multipart` (`saml.py:53`) |
+| 1b | Public | Start verification / build AuthnRequest | `POST /auth/verifications` via ingress | **OK** — `201`, signed `SAMLRequest` → `stg-idp-pki.mtcit.gov.om` (fixed by adding `python-multipart`) |
 | 2 | Tunnel | BD → SAS/DSS/Self-Service (outbound) | `nc` + `curl` from DMZ to `10.31.10.22` / `.31` / `.33:443` | **OK** — all 3 **open + TLSv1.3 handshake** (after on-prem Cisco NAT fix; was timing out earlier) |
 | 3 | Out-of-band | THEQA app ↔ MTCIT, user approves | — MTCIT side | **NOT TESTED** |
 | 4 | Tunnel | MTCIT → BD ACS (inbound, THEQA-originated) | — cannot originate | **NOT TESTED** |
 | 5 | Public | App polls verification result | `GET /auth/verifications/{ref}` via ingress | **OK** — `404` on unknown (healthy) |
 | 6 | Public | App → consent `/bank-auth/theqa` | `POST /banking/bank-auth/theqa` (internal) | **OK** — `404` on unknown (healthy) |
 
-**Bottom line of testing — two distinct BD-side problems:**
-1. **Internal SP bug:** `POST /auth/verifications` → `500` because the SP container is missing
-   `python-multipart`. Nothing to do with MTCIT. Fix: add the dep, rebuild, redeploy.
+**Bottom line of testing — both BD-side problems now resolved:**
+1. **Internal SP bug — FIXED.** Added `python-multipart` (rev 23, `ob-theqa-service:c7184dc3`):
+   `POST /auth/verifications` now `201` with a signed `SAMLRequest` to MTCIT, and `/auth/saml/acs`
+   parses real assertions (only errored earlier on a dummy non-XML payload).
 2. **BD egress to MTCIT — NOW WORKING.** From the DMZ, `nc` + `curl` to all 3 destinations
    (`10.31.10.22 / .31 / .33:443`) now return **port open + a completed TLSv1.3 handshake**
    (earlier they timed out). OCI routing was always correct (VCN → DRG → FastConnect, with
