@@ -37,33 +37,34 @@ sequenceDiagram
 
     rect rgb(223,238,255)
     Note over App,ING: CHANNEL 1 — PUBLIC, mobile talks ONLY to BD
-    App->>ING: POST /auth/verifications + identifier ✅
-    ING->>SP: cross-cluster to RTZ ✅
-    Note over SP: build and sign AuthnRequest, IdP cert loaded ✅
+    App->>ING: GET /auth/saml/metadata and /health  ✅ OK 200
+    App->>ING: POST /auth/verifications  ❌ FAILED 500
+    Note over SP: cert loaded OK, but start crashes before AuthnRequest<br>SP image missing python-multipart ❌
     end
 
     rect rgb(223,247,223)
     Note over SP,IDP: CHANNEL 2 — BD initiates over the ONE-WAY tunnel
     SP->>NAT: AuthnRequest to SAS
-    NAT->>IDP: src SNAT to 172.16.24.1, dst 10.31.10.22 port 443 ✅ reachable
+    NAT->>IDP: src SNAT 172.16.24.1 dst 10.31.10.22 port 443  ❓ NOT TESTED
+    Note over NAT,IDP: cannot originate as the NAT source, MTCIT states reachable
     end
 
     rect rgb(255,247,219)
-    Note over THQ,IDP: CHANNEL 3 — OUT-OF-BAND, MTCIT own channel
+    Note over THQ,IDP: CHANNEL 3 — OUT-OF-BAND, MTCIT own channel  ❓ NOT TESTED
     IDP-->>THQ: challenge to THEQA app
     THQ->>IDP: user approves national ID
     end
 
     rect rgb(223,247,223)
-    Note over IDP,SP: SAML Response back to ACS — dst NAT 172.16.24.2 (see open item on one-way)
+    Note over IDP,SP: SAML Response back to ACS, THEQA-originated  ❓ NOT TESTED
     IDP->>NAT: SAML Response, dst 172.16.24.2 port 443 NATed
-    NAT->>SP: DNAT to BD ingress then /auth/saml/acs, store national_id
+    NAT->>SP: DNAT to BD ingress then /auth/saml/acs
     end
 
     rect rgb(223,238,255)
     Note over App,SP: CHANNEL 1 — mobile polls BD then logs in
-    App->>SP: poll /auth/verifications/ref until verified ✅
-    App->>SP: then POST /api/bank-auth/theqa to ob-consent-service ✅
+    App->>SP: GET /auth/verifications/ref  ✅ OK 404 on unknown
+    App->>SP: POST /api/bank-auth/theqa  ✅ OK 404 on unknown
     end
 ```
 
@@ -98,24 +99,36 @@ flowchart LR
 
 ## 3. Status by leg
 
-| # | Channel | Leg | Address | Status |
-|---|---------|-----|---------|--------|
-| 1 | Public | App → DMZ ingress → SP `/auth/verifications` | `158.179.3.104` | ✅ working |
-| 1 | Public | SP builds + signs AuthnRequest | SP key + IdP cert loaded | ✅ working |
-| 2 | Tunnel | BD → SAS IdP (outbound, NAT) | src `172.16.24.1` → SAS `10.31.10.22:443` | ✅ MTCIT: reachable |
-| 3 | Out-of-band | THEQA app ↔ MTCIT, user approves | device ↔ MTCIT | — MTCIT side |
-| 4 | Tunnel | MTCIT → BD ACS (inbound, NAT) | dst `172.16.24.2:443` → ACS | ⚠️ see open item (one-way) |
-| 5 | Public | App polls result, then `/bank-auth/theqa` | RTZ SP + `ob-consent-service` | ✅ ready / verified |
+Legend: **OK** = I tested it and it works · **FAILED** = I tested it and it fails ·
+**NOT TESTED** = I cannot originate this traffic (e.g. THEQA→us, or traffic that must be sourced
+as the `172.16.24.1` NAT).
 
-**I am not claiming any connection failure.** MTCIT confirmed all 3 destinations reachable
-(2026-06-03). Earlier "timeouts" I reported were invalid tests — I dialed `10.31.10.x` from an
-OKE pod that is **not** NAT'd to `172.16.24.1`, so it could never reach MTCIT. Only properly-NAT'd
-traffic does.
+| # | Channel | Leg | What I ran (2026-06-09) | Result |
+|---|---------|-----|-------------------------|--------|
+| 1a | Public | Ingress → SP reachability | `GET /auth/saml/metadata`, `/health` via `158.179.3.104` | **OK** — `200` |
+| 1b | Public | Start verification / build AuthnRequest | `POST /auth/verifications` via ingress | **FAILED** — `500`, SP image missing `python-multipart` (`saml.py:53`) |
+| 2 | Tunnel | BD → SAS IdP (outbound, NAT) | — cannot source as `172.16.24.1` | **NOT TESTED** — MTCIT states reachable (2026-06-03) |
+| — | BD-side | DMZ pod → `172.16.24.1:443` / `172.16.24.2:443` | `nc`/ping from `theqa-egress` pod | **FAILED** — 100% loss / timeout (note: `.1` is source-NAT, no listener expected; pod egress is Calico `10.244.x`) |
+| 3 | Out-of-band | THEQA app ↔ MTCIT, user approves | — MTCIT side | **NOT TESTED** |
+| 4 | Tunnel | MTCIT → BD ACS (inbound, THEQA-originated) | — cannot originate | **NOT TESTED** |
+| 5 | Public | App polls verification result | `GET /auth/verifications/{ref}` via ingress | **OK** — `404` on unknown (healthy) |
+| 6 | Public | App → consent `/bank-auth/theqa` | `POST /banking/bank-auth/theqa` (internal) | **OK** — `404` on unknown (healthy) |
+
+**Bottom line of testing:** the BD public surface is up (ingress, SP metadata, poll endpoint,
+consent provisioning), **but the start-verification call `POST /auth/verifications` returns 500**
+because the SP container is missing the `python-multipart` dependency — a real, fixable bug
+(add to `requirements.txt`, rebuild). The MTCIT-facing legs (outbound via the NAT, inbound from
+THEQA) I genuinely cannot originate, so they are marked NOT TESTED.
 
 ---
 
 ## 4. Open items (application / config — not network)
 
+0. **[BUG, tested] `POST /auth/verifications` → 500.** The SP container is missing
+   `python-multipart`, so `saml.py:_request_payload` throws `AssertionError: The python-multipart
+   library must be installed to use form parsing`. Fix: add `python-multipart` to
+   `services/ob-theqa-service/requirements.txt`, rebuild via CI, redeploy. This blocks the start of
+   the whole flow.
 1. **One-way tunnel vs inbound ACS.** The tunnel is **BD-initiated one-way**. The outbound
    AuthnRequest to SAS (`10.31.10.22`) works. The **SAML Response to ACS** is drawn as an inbound
    POST to `172.16.24.2` — confirm with MTCIT whether the assertion returns **synchronously on the
