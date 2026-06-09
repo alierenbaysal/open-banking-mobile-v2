@@ -42,11 +42,11 @@ sequenceDiagram
     Note over SP: cert loaded OK, but start crashes before AuthnRequest<br>SP image missing python-multipart ❌
     end
 
-    rect rgb(255,224,224)
+    rect rgb(223,247,223)
     Note over SP,IDP: CHANNEL 2 — BD initiates over the tunnel
     SP->>NAT: AuthnRequest to SAS
-    NAT->>IDP: dst 10.31.10.22 port 443  ❌ FAILED telnet TIMED OUT from DMZ
-    Note over NAT,IDP: all 3 dests time out from DMZ, yet MTCIT says reachable<br>BD-side egress/NAT path gap, not MTCIT
+    NAT->>IDP: dst 10.31.10.22 port 443  ✅ OK port open + TLSv1.3 handshake from DMZ
+    Note over NAT,IDP: all 3 dests OPEN and TLS negotiated, after on-prem Cisco NAT fix
     end
 
     rect rgb(255,247,219)
@@ -107,7 +107,7 @@ as the `172.16.24.1` NAT).
 |---|---------|-----|-------------------------|--------|
 | 1a | Public | Ingress → SP reachability | `GET /auth/saml/metadata`, `/health` via `158.179.3.104` | **OK** — `200` |
 | 1b | Public | Start verification / build AuthnRequest | `POST /auth/verifications` via ingress | **FAILED** — `500`, SP image missing `python-multipart` (`saml.py:53`) |
-| 2 | Tunnel | BD → SAS/DSS/Self-Service (outbound) | telnet from DMZ to `10.31.10.22` / `.31` / `.33:443` | **FAILED** — all 3 **timed out** (port not open from DMZ) |
+| 2 | Tunnel | BD → SAS/DSS/Self-Service (outbound) | `nc` + `curl` from DMZ to `10.31.10.22` / `.31` / `.33:443` | **OK** — all 3 **open + TLSv1.3 handshake** (after on-prem Cisco NAT fix; was timing out earlier) |
 | 3 | Out-of-band | THEQA app ↔ MTCIT, user approves | — MTCIT side | **NOT TESTED** |
 | 4 | Tunnel | MTCIT → BD ACS (inbound, THEQA-originated) | — cannot originate | **NOT TESTED** |
 | 5 | Public | App polls verification result | `GET /auth/verifications/{ref}` via ingress | **OK** — `404` on unknown (healthy) |
@@ -116,11 +116,11 @@ as the `172.16.24.1` NAT).
 **Bottom line of testing — two distinct BD-side problems:**
 1. **Internal SP bug:** `POST /auth/verifications` → `500` because the SP container is missing
    `python-multipart`. Nothing to do with MTCIT. Fix: add the dep, rebuild, redeploy.
-2. **BD egress to MTCIT FAILS:** telnet from the DMZ to all 3 destinations
-   (`10.31.10.22 / .31 / .33:443`) **times out**, even though MTCIT confirms they are reachable.
-   So our DMZ-OKE traffic is **not** leaving as `172.16.24.1` / not landing on the tunnel — a
-   **BD-side egress/NAT/routing gap** (DMZ subnet route to the DRG, the firewall NAT rule covering
-   the OKE node source, or Calico `natOutgoing`). This is the thing to chase with the network team.
+2. **BD egress to MTCIT — NOW WORKING.** From the DMZ, `nc` + `curl` to all 3 destinations
+   (`10.31.10.22 / .31 / .33:443`) now return **port open + a completed TLSv1.3 handshake**
+   (earlier they timed out). OCI routing was always correct (VCN → DRG → FastConnect, with
+   `10.31.10.0/24` + `172.16.0.0/16` as DYNAMIC/BGP routes to the on-prem attachment); the gap
+   was the **on-prem Cisco NAT/route for the OKE source subnet**, which the network team has fixed.
 
 The inbound leg (MTCIT → ACS) and the out-of-band THEQA-app leg I genuinely cannot originate →
 NOT TESTED.
